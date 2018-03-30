@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+restServer, a PSR HTTP Message rest server implementation
+
+This file is a part of restServer.
+
+Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
+Link      http://kigkonsult.se/restServer/index.php
+Version   0.8.0
+License   Subject matter of licence is the software restServer.
+          The above copyright, link, package and version notices and
+          this licence notice shall be included in all copies or
+          substantial portions of the restServer.
+          restServer can be used either under the terms of
+          a proprietary license, available at <https://kigkonsult.se/>
+          or the GNU Affero General Public License, version 3:
+          restServer is free software: you can redistribute it and/or
+          modify it under the terms of the GNU Affero General Public License
+          as published by the Free Software Foundation, either version 3 of
+          the License, or (at your option) any later version.
+          restServer is distributed in the hope that it will be useful,
+          but WITHOUT ANY WARRANTY; without even the implied warranty of
+          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+          GNU Affero General Public License for more details.
+          You should have received a copy of the GNU Affero General Public
+          License along with this program.
+          If not, see <http://www.gnu.org/licenses/>.
+
+-->
+<phpunit backupGlobals="false"
+         backupStaticAttributes="false"
+         colors="true"
+         convertErrorsToExceptions="true"
+         convertNoticesToExceptions="true"
+         convertWarningsToExceptions="true"
+         processIsolation="false"
+         syntaxCheck="false"
+         bootstrap="src/autoload.php"
+        >
+    <testsuites>
+        <testsuite name="config Tests">
+            <file>./test/ConfigTest.php</file>
+        </testsuite>
+        <testsuite name="ServerRequestFactory Tests">
+            <file>./test/ServerRequestFactoryTest.php</file>
+        </testsuite>
+        <testsuite name="Response Tests">
+            <file>./test/ResponseTest.php</file>
+        </testsuite>
+        <testsuite name="RequestMethodHandler Tests">
+            <file>./test/Handlers/RequestMethodHandlerTest.php</file>
+        </testsuite>
+        <testsuite name="ContentTypeHandlers Tests">
+            <file>./test/Handlers/ContentTypeHandlers/JsonHandlerTest.php</file>
+            <file>./test/Handlers/ContentTypeHandlers/XMLHandlerTest.php</file>
+        </testsuite>
+        <testsuite name="ContentTypeHandler Tests">
+            <file>./test/Handlers/ContentTypeHandlerTest.php</file>
+        </testsuite>
+        <testsuite name="EncodingHandlers Tests">
+            <file>./test/Handlers/EncodingHandlers/GzipHandlerTest.php</file>
+            <file>./test/Handlers/EncodingHandlers/DeflateHandlerTest.php</file>
+        </testsuite>
+        <testsuite name="EncodingHandler Tests">
+            <file>./test/Handlers/EncodingHandlerTest.php</file>
+        </testsuite>
+        <testsuite name="CorsHandler Tests">
+            <file>./test/Handlers/CorsHandlerTest.php</file>
+        </testsuite>
+        <testsuite name="RestServer Tests">
+            <file>./test/RestServerTest.php</file>
+        </testsuite>
+    </testsuites>
+    <filter>
+        <whitelist processUncoveredFilesFromWhitelist="true">
+            <file>./src/Response.php</file>
+            <file>./src/RestServer.php</file>
+            <file>./src/ServerRequestFactory.php</file>
+            <file>./src/Handlers/AbstractHandler.php</file>
+            <file>./src/Handlers/RequestMethodHandler.php</file>
+            <file>./src/Handlers/CorsHandler.php</file>
+            <file>./src/Handlers/AbstractCteHandler.php</file>
+            <file>./src/Handlers/ContentTypeHandler.php</file>
+            <file>./src/Handlers/ContentTypeHandlers/JsonHandler.php</file>
+            <file>./src/Handlers/ContentTypeHandlers/XMLHandler.php</file>
+            <file>./src/Handlers/EncodingHandler.php</file>
+            <file>./src/Handlers/EncodingHandlers/DeflateHandler.php</file>
+            <file>./src/Handlers/EncodingHandlers/GzipHandler.php</file>
+            <file>./src/Handlers/EncodingHandlers/IdentityHandler.php</file>
+            <file>./src/Handlers/LogUtilHandler.php</file>
+            <file>./src/Handlers/Exceptions/JsonErrorException.php</file>
+            <file>./src/Handlers/Exceptions/LIBXMLFatalErrorException.php</file>
+            <file>./src/Handlers/Exceptions/SimplexmlLoadErrorException.php</file>
+            <file>./src/Handlers/Exceptions/ZlibErrorException.php</file>
+        </whitelist>
+    </filter>
+  <logging>
+      <!-- All logs will be saved in 'testDocs' folder -->
+      <log type="coverage-html"
+           target="testDocs/PHPUnitCoverage"
+           lowUpperBound="35"
+           highLowerBound="70"/>
+      <log type="coverage-clover"
+           target="testDocs/coverage.xml"/>
+      <log type="coverage-php"
+           target="testDocs/coverage.serialized"/>
+      <log type="coverage-text"
+           target="testDocs/PHPUnitReport.txt"
+           showUncoveredFiles="true"/>
+      <log type="json"
+           target="testDocs/logfile.json"/>
+      <log type="tap"
+           target="testDocs/logfile.tap"/>
+      <log type="junit"
+           target="testDocs/logfile.xml"
+           logIncompleteSkipped="false"/>
+      <log type="testdox-html"
+           target="testDocs/testdox.html"/>
+      <log type="testdox-text"
+           target="testDocs/testdox.txt"/>
+  </logging>
+    <php>
+        <const name="LOG" value="0"/>
+    </php>
+</phpunit>
