@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.8.3
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -73,7 +73,7 @@ class RestServer
     /**
      * @var string
      */
-    private static $version = '0.8.2';
+    private static $version = '0.8.3';
 
     /**
      * Handler callbacks, called before routing

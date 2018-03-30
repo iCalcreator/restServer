@@ -1,6 +1,6 @@
 {
   "name": "kigkonsult/restserver",
-  "description": "REST server based on psr, zend-diactoros and zend-diactoros",
+  "description": "REST server based on psr, zend-diactoros and fast-route",
   "keywords": [
     "rest",
     "server",
