@@ -73,7 +73,7 @@ class RestServer
     /**
      * @var string
      */
-    private static $version = '0.8.0';
+    private static $version = '0.8.1';
 
     /**
      * Handler callbacks, called before routing
