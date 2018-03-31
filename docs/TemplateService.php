@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.8.4
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -38,6 +38,15 @@
      * please visit https://github.com/nikic/FastRoute.
      * Derived (uri) arguments, if any, are accessible(/included) using
      * request::getParsedBody()
+     *
+     * A callable can be
+     *   simple function
+     *   anonymous function
+     *   instantiated object+method, passed as an array: object, method name
+     *   class name and static method, passed as an array: class, method name (factory method?)
+     *   instantiated object, class has an (magic) __call method
+     *   class name, class has an (magic) __callStatic method
+     *   instantiated object, class has an (magic) __invoke method
      *
      * Service definition callbacks MUST have arguments
      *   ServerRequestInterface and ResponseInterface.

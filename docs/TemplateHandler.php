@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.8.4
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -43,9 +43,11 @@
      * A handler (callable) can be
      *   simple function
      *   anonymous function
-     *   instantiated object, passed as an array: object, method name
-     *   class name and static method, passed as an array: class, method name
-     *   class instance, class has an __call/__callStatic method
+     *   instantiated object+method, passed as an array: object, method name
+     *   class name and static method, passed as an array: class, method name (factory method?)
+     *   instantiated object, class has an (magic) __call method
+     *   class name, class has an (magic) __callStatic method
+     *   instantiated object, class has an (magic) __invoke method
      *
      * The callable MUST
      *   have two arguments, ServerRequestInterface and ResponseInterface

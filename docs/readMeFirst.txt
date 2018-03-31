@@ -5,9 +5,7 @@ This file is a part of restServer.
 
 Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
 Link      http://kigkonsult.se/restServer/index.php
-Version   0.8.0
- * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+Version   0.8.4
 License   Subject matter of licence is the software restServer.
           The above copyright, link, package and version notices and
           this licence notice shall be included in all copies or
@@ -152,14 +150,16 @@ You must define your rest service definitions as (array)
   callback
 
 Method is a http method (GET, POST etc) (or array of methods).
-How to use and apply uri are described at https://github.com/nikic/FastRoute.
+How to use and apply uri are described in https://github.com/nikic/FastRoute.
 A callback (callable) can be
   simple function
   anonymous function
   instantiated object+method, passed as an array: object, method name
   class name and static method, passed as an array: class, method name (factory method?)
-  class instance, class has an (magic) __call method
+  instantiated object, class has an (magic) __call method
   class name, class has an (magic) __callStatic method
+  instantiated object, class has an (magic) __invoke method
+For examples, review 'test/RestServerTest.php' (method RestServer0Provider).
 
   The callback must be invoked with two arguments,
    (ServerRequestInterface) request,
