@@ -108,7 +108,7 @@ In the restServer package docs folder are found
 
 
 For restServer issues, use [github].
-Due to the restServer development status (ver 0.8.0), review reports are appreciated!
+Due to the restServer development status (ver 0.9.24), review reports are appreciated!
 
 Credits and base software information
 -------------------------------------
@@ -120,7 +120,7 @@ Credits and base software information
 
 Built status
 ------------
-Dev 0.9.23
+Dev 0.9.24
 
 [PSR HTTP message interfaces]: https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-7-http-message.md
 [PSR HTTP message Util interfaces]: https://github.com/php-fig/http-message-util
