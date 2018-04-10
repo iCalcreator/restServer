@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -29,7 +29,8 @@
 
 namespace Kigkonsult\RestServer;
 
-use Kigkonsult\RestServer\Handlers\RequestMethodHandler;
+// use Kigkonsult\RestServer\Handlers\RequestMethodHandler;
+// use Kigkonsult\RestServer\Handlers\CorsHandler;
 
 /**
  * Configuration for RestServer
@@ -38,119 +39,140 @@ use Kigkonsult\RestServer\Handlers\RequestMethodHandler;
  * outside webserver document root.
  */
 $config = [];
-    /**
-     * Most config keys have only test or default values set,
-     * include ONLY on after alteration!!
-     */
+/**
+ * Most config keys have only test or default values set,
+ * include ONLY on after alteration!!
+ */
 
-    /** *********************************************************************
-     * baseUri
-     *
-     * Part of request Uri to ELIMINATE to match service uri
-     *
-     * ex1. server is invoked using
-     * 'http://localhost/www/index.php'
-     * and
-     * your service uri (routes) is like '/', then
-     * baseUri = 'index.php'
-     *
-     *
-     * ex2. server is invoked using
-     * 'http://localhost/www/index.php/user'
-     * and
-     * your service uri (routes) is like '/user', then
-     * baseUri = 'index.php'
-     *
-     * ex3. server is invoked using
-     * 'http://192.168.0.1/user'
-     * and
-     * your service routes has an request URI like '/user', then
-     * baseUri = ''
-     *
-     * Default : the file(/script) the RestServer class is invoked from
-     * Will ease up going from test to production environment
-     *
-     * value type : string
-     */
+/** *********************************************************************
+ * correlation-id
+ *
+ * unique session id, if not set here is it automatically generated
+ *
+ * value type : string
+ */
+$config[RestServer::CORRELATIONID] = strtoupper( bin2hex( openssl_random_pseudo_bytes( 16 )));
+
+/** *********************************************************************
+ * baseUri
+ *
+ * Part of request Uri to ELIMINATE to match service uri
+ *
+ * ex1. server is invoked using
+ * 'http://localhost/www/index.php'
+ * and
+ * your service uri (routes) is like '/', then
+ * baseUri = 'index.php'
+ *
+ *
+ * ex2. server is invoked using
+ * 'http://localhost/www/index.php/user'
+ * and
+ * your service uri (routes) is like '/user', then
+ * baseUri = 'index.php'
+ *
+ * ex3. server is invoked using
+ * 'http://192.168.0.1/user'
+ * and
+ * your service routes has an request URI like '/user', then
+ * baseUri = ''
+ *
+ * Default : the file(/script) the RestServer class is invoked from
+ * Will ease up going from test to production environment
+ *
+ * value type : string
+ */
 // $config[RestServer::BASEURI] = 'index.php';
-    /** *********************************************************************
-     * Default are all request methods allowed
-     *
-     * If you do NOT want to allow some (ex HEAD and OPTIONS methods), activate below.
-     * Otherwice (default) allowed are
-     *  request method HEAD only if any service method GET exists
-     *    i.e. no HEAD service required, will pick GET service
-     *  request method OPTIONS
-     *    note, an OPTIONS (non-CORS/preflight) request will automatically
-     *    create a response with
-     *       header (Allow) containing all service definition request-methods
-     *       a response body (json string) with ALL (attached) request methods and targets,
-     *         (as for now) regardless of current request target!
-     *  request methods from services
-     *
-     * value type : array
-     */
+
+/** *********************************************************************
+ * Default are all request methods allowed
+ *
+ * If you do NOT want to allow some (ex HEAD and OPTIONS methods), activate below.
+ * Otherwice (default) allowed are
+ * request method HEAD only if any service method GET exists
+ *   i.e. no HEAD service required, will pick GET service
+ * request method OPTIONS
+ *   note, an OPTIONS (non-CORS/preflight) request will automatically
+ *   create a response with
+ *      header (Allow) containing all service definition request-methods
+ *      a response body (json string) with ALL (attached) request methods and targets,
+ *        (as for now) regardless of current request target!
+ *
+ *value type : array
+ */
 /*
 $config[RestServer::DISALLOW] = [
-    RequestMethodHandler::OPTIONS,
-    RequestMethodHandler::HEAD
+    RequestMethodHandler::METHOD_OPTIONS,
+    RequestMethodHandler::METHOD_HEAD
 ];
  */
-    /** *********************************************************************
-     *
-     * Opt. configuration for the builtin CorsHandler
-     * Note, OPTIONS (above) must be allowed to manage preflights requests
-     * See cfg.2.cors.php for more details.
-     *
-     * value type : array
-     *
-     * Note, NO $config[CorsHandler::CORS] means no cors mgnt,
-     */
+
+/** *********************************************************************
+ *
+ * Opt. configuration for the builtin CorsHandler
+ * Note, OPTIONS (above) must be allowed to manage preflights requests
+ * See cfg.2.cors.php for more details.
+ *
+ * value type : array
+ *
+ * Note, NO $config[CorsHandler::CORS] means no cors mgnt,
+ */
 // $config[CorsHandler::CORS] = include 'cfg/cfg.2.cors.php';
 
-    /** *********************************************************************
-     *
-     * Opt. debug logging
-     *
-     * value type : bool
-     *
-     * Require a logger class instance is set (RestServer::setLogger())
-     */
+/** *********************************************************************
+ *
+ * Opt. debug logging
+ *
+ * value type : bool
+ *
+ * Require a logger class instance is set (RestServer::setLogger())
+ */
 // config[RestServer::DEBUG] = true;
 
-    /** *********************************************************************
-     *
-     * Opt. configuration
-     * for the builtin ContentTypeHandler/EncodingHandler
-     * See cfg.56.cte.php for more details.
-     *
-     * value type : array
-     */
+/** *********************************************************************
+ *
+ * Opt. configuration
+ * for the builtin ContentTypeHandler/EncodingHandler
+ * See cfg.56.cte.php for more details.
+ *
+ * value type : array
+ */
 // $config += include './cfg.56.cte.php';
-    /** *********************************************************************
-     *
-     * Rest service endpoint definitions
-     * see docs/TemplateService.php for implementation
-     *
-     * value type : array
-     */
+
+/** *********************************************************************
+ *
+ * Rest service definitions
+ * see docs/TemplateService.php for implementation
+ *
+ * value type : array  [ string|string[], string, callable ] 
+ */
 /*
 $config[restServer::SERVICES][] = [
     RestServer::METHOD   => <method>
     RestServer::URI      => <uri>,
-    RestServer::CALLBACK => <callback>
+    RestServer::CALLBACK => <callable>
 ];
  */
-    /** *********************************************************************
-     *
-     * Custom rest service handlers
-     * see docs/TemplateHandler.php for implementation
-     *
-     * value type : array
-     */
-// $config[restServer::HANDLERS][] = <callback>;
 
-    /**
-     * Return config
-     */
+/** *********************************************************************
+ *
+ * Custom handlers
+ * see docs/TemplateHandler.php for implementation
+ *
+ * value type : callable
+ */
+// $config[restServer::HANDLERS][] = <callable>;
+
+/** *********************************************************************
+ *
+ * Final custom handler
+ * see docs/TemplateHandler.php for implementation
+ *
+ * value type : callable
+ */
+// $config[restServer::FINALHANDLER] = <callable>;
+
+/**
+ * Return config
+ */
 return $config;

@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -39,6 +39,7 @@ use PHPUnit\Framework\TestCase;          // PHPUnit > 6.1.0
 use Zend\Diactoros\ServerRequest;
 use Kigkonsult\RestServer\Response;
 use Kigkonsult\RestServer\RestServer;
+use Kigkonsult\RestServer\StreamFactory;
 
 class CorsHandlerTest extends TestCase
 {
@@ -56,12 +57,16 @@ class CorsHandlerTest extends TestCase
             [CorsHandler::ORIGIN => 'test.com'],
             [],
         ];
+        $dataArr[] = [
+            [CorsHandler::ORIGIN => 'test.com'],
+            [CorsHandler::CORS => [RestServer::IGNORE => true]],
+        ];
 
         return $dataArr;
     }
 
     /**
-     * test validateCors, no cors mgnt
+     * test validateCors, no cors mgnt  (not exists and found+ignore)
      *
      * @test
      * @dataProvider validateCors1Provider
@@ -75,7 +80,7 @@ class CorsHandlerTest extends TestCase
             [],                         // $uploadedFiles
            null,                    // uri
            null,                 // method
-            RestServer::getNewStream(), // body
+            StreamFactory::createStream(), // body
             $headers                    // headers
                                     );
         $request                    = $request->withAttribute( RestServer::CONFIG, $config );
@@ -94,7 +99,13 @@ class CorsHandlerTest extends TestCase
         $dataArr   = [];
         $dataArr[] = [
             [],
-            [CorsHandler::CORS => [RestServer::ALLOW => ['test.com']]],
+            [
+                CorsHandler::CORS => [
+                    RestServer::ALLOW => [
+                        'test.com'
+                    ]
+                ]
+            ],
         ];
         $dataArr[] = [
             [],
@@ -120,12 +131,12 @@ class CorsHandlerTest extends TestCase
         array $config
     ) {
         $request = new ServerRequest(
-            [],                        // serverParams
-            [],                        // $uploadedFiles
-           null,                      // uri
-           null,                      // method
-            RestServer::getNewStream(), // body
-            $headers                   // headers
+            [],                          // serverParams
+            [],                          // $uploadedFiles
+           null,                     // uri
+           null,                  // method
+            StreamFactory::createStream(),  // body
+            $headers                     // headers
         );
         $request                    = $request->withAttribute( RestServer::CONFIG, $config );
         list( $request, $response ) = CorsHandler::validateCors(
@@ -140,9 +151,61 @@ class CorsHandlerTest extends TestCase
     }
 
     /**
-     * testvalidateCors3 provider
+     * testvalidateCors3a provider
      */
-    public function validateCors3Provider()
+    public function validateCors3aProvider()
+    {
+        $dataArr[] = [
+            [
+                CorsHandler::ORIGIN => 'wrong.com'
+            ],
+            [
+                CorsHandler::CORS => [
+                    RestServer::IGNORE      => false,
+                    CorsHandler::ERRORCODE2 => 418,
+                ],
+            ],
+        ];
+
+        return $dataArr;
+    }
+
+    /**
+     * test validateCors, not require origin header and found and not ignore, ERRORCODE2
+     *
+     * @test
+     * @dataProvider validateCors3aProvider
+     */
+    public function testvalidateCors3a(
+        array $headers,
+        array $config
+    ) {
+        $request = new ServerRequest(
+            [],                         // serverParams
+            [],                         // $uploadedFiles
+            null,                    // uri
+            null,                 // method
+            StreamFactory::createStream(), // body
+            $headers                    // headers
+        );
+        $request                    = $request->withAttribute( RestServer::CONFIG, $config );
+        $request                    = $request->withAttribute( RestServer::REQUESTMETHODURI, [RequestMethodHandler::METHOD_GET => ['/']]);
+        $request                    = $request->withMethod( RequestMethodHandler::METHOD_GET );
+        list( $request, $response ) = CorsHandler::validateCors(
+            $request,
+            new Response()
+        );
+        $this->assertTrue( $request->getAttribute( RestServer::ERROR ));
+        $statusCode = ( isset( $config[CorsHandler::CORS][CorsHandler::ERRORCODE2] ))
+            ? $config[CorsHandler::CORS][CorsHandler::ERRORCODE2]
+            : 433;
+        $this->assertEquals( $statusCode, $response->getStatusCode());
+    }
+
+    /**
+     * testvalidateCors3b provider
+     */
+    public function validateCors3bProvider()
     {
         $dataArr   = [];
         $dataArr[] = [
@@ -163,21 +226,21 @@ class CorsHandlerTest extends TestCase
     }
 
     /**
-     * test validateCors, require origin header and found is not expected, ERRORCODE2
+     * test validateCors, require origin header and no match, ERRORCODE2
      *
      * @test
-     * @dataProvider validateCors3Provider
+     * @dataProvider validateCors3bProvider
      */
-    public function testvalidateCors3(
+    public function testvalidateCors3b(
         array $headers,
         array $config
     ) {
         $request = new ServerRequest(
             [],                         // serverParams
             [],                         // $uploadedFiles
-           null,                    // uri
-           null,                 // method
-            RestServer::getNewStream(), // body
+            null,                    // uri
+            null,                 // method
+            StreamFactory::createStream(), // body
             $headers                    // headers
         );
         $request                    = $request->withAttribute( RestServer::CONFIG, $config );
@@ -189,8 +252,8 @@ class CorsHandlerTest extends TestCase
         );
         $this->assertTrue( $request->getAttribute( RestServer::ERROR ));
         $statusCode = ( isset( $config[CorsHandler::CORS][CorsHandler::ERRORCODE2] ))
-                             ? $config[CorsHandler::CORS][CorsHandler::ERRORCODE2]
-                             : 403;
+            ? $config[CorsHandler::CORS][CorsHandler::ERRORCODE2]
+            : 403;
         $this->assertEquals( $statusCode, $response->getStatusCode());
     }
 
@@ -267,7 +330,7 @@ class CorsHandlerTest extends TestCase
             [],                         // $uploadedFiles
            null,                    // uri
            null,                 // method
-            RestServer::getNewStream(), // body
+            StreamFactory::createStream(), // body
             $headers                    // headers
                                     );
         $request                    = $request->withAttribute( RestServer::CONFIG, $config );
@@ -350,7 +413,7 @@ class CorsHandlerTest extends TestCase
             [],                                          // $uploadedFiles
            null,                                      // uri
            RequestMethodHandler::METHOD_OPTIONS,  // method
-            RestServer::getNewStream(),                  // body
+            StreamFactory::createStream(),                  // body
             $headers                                     // headers
         );
         $request                    = $request->withAttribute( RestServer::CONFIG, $config );
@@ -422,7 +485,7 @@ class CorsHandlerTest extends TestCase
             [],                                         // $uploadedFiles
            null,                                     // uri
            RequestMethodHandler::METHOD_OPTIONS, // method
-            RestServer::getNewStream(),                 // body
+            StreamFactory::createStream(),                 // body
             $headers                                    // headers
         );
         $request                    = $request->withAttribute( RestServer::CONFIG, $config );
@@ -495,7 +558,7 @@ class CorsHandlerTest extends TestCase
             [],                                          // $uploadedFiles
            null,                                     // uri
            RequestMethodHandler::METHOD_OPTIONS,  // method
-            RestServer::getNewStream(),                  // body
+            StreamFactory::createStream(),                  // body
             $headers                                     // headers
                                     );
         $request = $request->withAttribute( RestServer::CONFIG, $config );

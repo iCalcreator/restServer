@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -30,7 +30,7 @@
 namespace Kigkonsult\RestServer\Handlers;
 
 use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use Kigkonsult\RestServer\ResponseInterface;
 use Kigkonsult\RestServer\RestServer;
 use RuntimeException;
 
@@ -48,7 +48,7 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
      * Register a new type Handler
      *
      * @param string $type
-     * @param string $Handler  ex  [ <full namespace class name>, <method> ]
+     * @param string $handler  ex  [ <full namespace class name>, <method> ]
      * @static
      */
     public static function register(
@@ -81,7 +81,7 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
                 }
             }
             $class::$types = $tmp;
-        }
+        } // end if
         return $success;
     }
 
@@ -192,7 +192,6 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
     final private static function typesToArray(
         array $types
     ) {
-        static $SP1 = ' ';
         static $SP2 = '  ';
         static $SC  = ';';
         static $QEQ = 'q=';
@@ -200,15 +199,15 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
         foreach ( $types as $cType ) {
             foreach ( \explode( self::COMMA, $cType ) as $theType ) {
                 while ( false !== \strpos( $theType, $SP2 )) {
-                    $theType = \str_replace( $SP2, $SP1, $theType );
+                    $theType = \str_replace( $SP2, self::$SP, $theType );
                 }
                 $theType = \strtolower( \trim( $theType ));
                 if ( false !== \strpos( $theType, $SC )) {
                     $tmp = [];
                     foreach ( \explode( $SC, $theType ) as $x => $t ) {
                         $t = \trim( $t );
-                        if ( false !== \strpos( $t, $SP1 )) { // skip tail
-                            $t = \explode( $SP1, $t, 2 )[0];
+                        if ( false !== \strpos( $t, self::$SP )) { // skip tail
+                            $t = \explode( self::$SP, $t, 2 )[0];
                         }
                         if ( empty( $t )) {
                             continue;
@@ -221,8 +220,8 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
                     } // end foreach
                     $theType = \implode( $SC, $tmp );
                 } // end if
-                elseif ( false !== \strpos( $theType, $SP1 )) { // skip tail
-                    $theType = \explode( $SP1, $theType, 2 )[0];
+                elseif ( false !== \strpos( $theType, self::$SP )) { // skip tail
+                    $theType = \explode( self::$SP, $theType, 2 )[0];
                 }
                 if ( ! isset( $cTypes[$theType] )) {
                     $cTypes[$theType] = $theType;
@@ -313,8 +312,8 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
                 if ( ! isset( $found[$aType] )) {
                     $found[$aType] = $aType;
                 }
-            }
-        }
+            } // end foreach
+        } // end if
         return \array_values( $found );
     }
 }

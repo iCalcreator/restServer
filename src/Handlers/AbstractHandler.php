@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -30,12 +30,19 @@
 namespace Kigkonsult\RestServer\Handlers;
 
 use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use Kigkonsult\RestServer\ResponseInterface;
 use Kigkonsult\RestServer\RestServer;
 use Exception;
 
 abstract class AbstractHandler implements HandlerInterface
 {
+    /**
+     * @var string ' '
+     * @access protected
+     * @static
+     */
+    protected static $SP = ' ';
+
     /**
      * Log and return
      *
@@ -55,11 +62,11 @@ abstract class AbstractHandler implements HandlerInterface
     ) {
         $logger = RestServer::getLogger();
         if ( ! empty( $logger ) && \method_exists( $logger, $prio )) {
-            $logger->{$prio}( $exception->getMessage());
-            $logger->{$prio}( LogUtilHandler::getRequestToString( $request ));
-            $logger->{$prio}( LogUtilHandler::getStringifiedObject( $exception ));
+            $config  = $request->getAttribute( RestServer::CONFIG, [] );
+            $corrId  = ( isset( $config[RestServer::CORRELATIONID] )) ? $config[RestServer::CORRELATIONID] . self::$SP : null;
+            $logger->{$prio}( $corrId . LogUtilHandler::jTraceEx( $exception ));
+            $logger->{$prio}( $corrId . LogUtilHandler::getRequestToString( $request ));
         }
-
         return [
             $request,
             $response,

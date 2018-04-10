@@ -5,7 +5,7 @@ This file is a part of restServer.
 
 Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
 Link      http://kigkonsult.se/restServer/index.php
-Version   0.8.4
+Version   0.9.23
 License   Subject matter of licence is the software restServer.
           The above copyright, link, package and version notices and
           this licence notice shall be included in all copies or
@@ -25,15 +25,15 @@ License   Subject matter of licence is the software restServer.
           License along with this program.
           If not, see <http://www.gnu.org/licenses/>.
 
-Product names mentioned herein are or may be trademarks or registered trademarks
-of their respective owners.
+Product names mentioned herein or elseware are or may be trademarks
+or registered trademarks of their respective owners.
 
 -----------------------
 rest services made easy
 -----------------------
 
 the purpose for restServer is to offer developers, as simple as possible,
-rest services for their applications.
+rest service API for their applications.
 
 "Everything should be made as simple as possible, but not simpler."
 [Albert Einstein]
@@ -56,11 +56,13 @@ OVERVIEW
 
 Here is a brief restServer orientation, more detailed below and in supplements.
 
-Very simple, restServer is wrapper for zend-diactoros Server.
 The input message is captured at restServer class instance creation.
+
 The input/output logistics are managed by restServer and its builtin handlers.
+
 There is an interface/API (service definition) for attach of external
 application(s) logic.
+
 Output message is returned in restServer method run.
 
 The (external, not included) application(s) must provide rest service
@@ -68,8 +70,8 @@ definition(s), each defined by
   request method(s),
   request target (uri),
   application callback.
-The service definition(s) are attached to restServer and fired off when an
-incoming request match a service definition.
+The service definition(s) are attached to restServer and the callback is fired
+off when an incoming request match method and uri in a service definition,
 
 Each rest service definitions callback must be invoked with two arguments,
 - (ServerRequestInterface) request
@@ -78,7 +80,8 @@ and return ResponseInterface response.
 
 restServer have builtin handlers managing messages serializing, en-/decoding
 and cors (Cross-Origin Resource Sharing). There are also a builtin handler for
-(log-)debuging. You can also attach custom handlers, ex. input sanitation.
+(log-)debuging. You can attach custom handlers, ex. for input sanitation, as
+well as a final handler.
 
 restServer also provide, optional,
   configuration for fine-tuning service,
@@ -108,27 +111,31 @@ REST MESSAGES
 
 Your rest service definition callback(s) as well as custom handler(s) have access
 to all methods in the incoming
-- Psr\Http\Message\ServerRequestInterface
+  Psr\Http\Message\ServerRequestInterface
 as well as outgoing
-- Psr\Http\Message\ResponseInterface
+  Psr\Http\Message\ResponseInterface
 as described in
-https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-7-http-message.md
+  https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-7-http-message.md
 and defined in
-https://github.com/php-fig/http-message
+  https://github.com/php-fig/http-message
 
 REQUEST
 
-You can access the incoming request message using
+You can access the (decoded and unserialized) incoming request message using
 
   request::getParsedBody()
 
-(opt. decoded and unserialized) for all HTTP methods, GET, POST etc.
-Note, for a (non-CORS, Cross-Origin Resource Sharing) request with method
-OPTIONS, a builtin response is returned with headers for (attached service
-definition) request methods and targets. For CORS pre-flight requests,
-response are returned automatically. OPTIONS requests will return a body with
-(service definition) http methods and corresponding request targets (uri)
-as a json-string.
+for all HTTP methods, GET, POST etc.
+
+For a (non-CORS, Cross-Origin Resource Sharing) OPTIONS request, a builtin
+response is returned with headers for (each attached service definition)
+request methods and targets. CORS pre-flight requests response are returned
+automatically (using the builtin CorsHandler). OPTIONS requests will return a
+body with (service definition) http methods and corresponding request targets
+(uri) as a json-string.
+
+HEAD requests (default allowed if GET service definition(s) exists) exec a
+matching GET service definition callback and return response with empty body.
 
 RESPONSE
 
@@ -136,48 +143,63 @@ For delivering a response message, use
 
   response::withRawBody( data )
 
-The method is not PSR HTTP standard but included to simplify response
-message delivery. Opt. serializing and encoding will be taken care of
-automatically, using restServer builtin supported serializers/encoders.
+The method is not PSR HTTP standard but included to simplify response message
+delivery. Later (opt.) serializing and encoding (with set headers) are taken
+care of automatically, using restServer builtin supported serializers/encoders.
 
 
 SERVICE DEFINITION
 ------------------
 
-You must define your rest service definitions as (array)
-  method
-  uri
-  callback
+The rest service definition(s) are the API for you application.
 
-Method is a http method (GET, POST etc) (or array of methods).
-How to use and apply uri are described in https://github.com/nikic/FastRoute.
-A callback (callable) can be
-  simple function
-  anonymous function
-  instantiated object+method, passed as an array: object, method name
-  class name and static method, passed as an array: class, method name (factory method?)
-  instantiated object, class has an (magic) __call method
-  class name, class has an (magic) __callStatic method
-  instantiated object, class has an (magic) __invoke method
+You must define your rest service definition(s) as (array)
+  method,
+    a http method (GET, POST etc) (or array of methods),
+  uri,
+    how to apply uri are described in https://github.com/nikic/FastRoute,
+  callback
+    A callback (callable) can be
+      simple function
+        functionName
+      anonymous function (closure)
+        variableValue...
+      instantiated object+method,
+        (array): objectInstance, method name
+      class name and static method,
+        (array): classNameWithNamespace, method name (factory method?)
+      instantiated object, class has an (magic) __call method
+        (array): objectInstance, method name
+      class name, class has an (magic) __callStatic method
+        (array): classNameWithNamespace, method name
+      instantiated object, class has an (magic) __invoke method
+        objectInstance
+
 For examples, review 'test/RestServerTest.php' (method RestServer0Provider).
 
-  The callback must be invoked with two arguments,
+The service definition callback must be invoked with two arguments,
    (ServerRequestInterface) request,
    (ResponseInterface)  response.
-  The callback must return a ResponseInterface response.
+The callback must return a ResponseInterface response.
 
 Service definition can be attached using
-  restServer::attachRestService()
-    below
-  using callback from RestServer:getAttachRestServiceCallback()
-    below
-  config
-    below
+  restServer::attachRestService(),
+  using callback from RestServer:getAttachRestServiceCallback(),
+  config,
+all described below.
 
 CALLBACK EXAMPLES
 
-Review TemplateService.php for more information about services and callbacks.
-There are examples of demo rest service classes and config and explicit attach.
+Review TemplateService.php for more information about services and callbacks,
+examples of demo rest service classes and config and explicit attach.
+
+The callback will have access to all methods in the incoming
+  Psr\Http\Message\ServerRequestInterface
+as well as outgoing
+  Psr\Http\Message\ResponseInterface.
+
+For return a response message, use
+  response::withRawBody( data )
 
 There is a simple builtin 'ping' service, ex. used when checking service is
 alive, attached using the builtin method restServer::getPingServiceDef().
@@ -191,29 +213,46 @@ For CORS (Cross-Origin Resource Sharing) builtin handler, review config (below)
 and cfg/cfg.2.cors.php for details.
 
 restServer unserializing and decoding builtin and custom handlers are invoked
-before any callback exec, opt. serializing and encoding builtin handlers after.
+  before any callback exec,
+opt. serializing and encoding builtin handlers
+  after
+the finalHandler (if set),
+  last, after return response is fired off, use ex. for tidy up, database close,
+  statistic metrics of performance footprint etc.
 
 Builtin serializing handlers manages
   application/json
   application/xml
   text/xml
   text/plain
-  application/x-www-form-urlencoded (*
-  multipart/form-data (*
-(* incomming POST only
+  application/x-www-form-urlencoded  -- incomming POST only
+  multipart/form-data                -- incomming POST only
 
-For Content-Type/Accept with
+For any serializing (header) Content-Type/Accept with
   trailing '+json' uses application/json handler,
   trailing '+xml' uses application/xml handler.
 
-Empty or '*/*' Accept header will use application/json as default (configurable).
+Missing, empty or '*/*' Accept header will use application/json as default
+(you can alter it in config).
 
 Builtin de/encoding handlers manages
   gzip,
   deflate,
   identity ('as is').
 
-Empty or '*' Accept-Encoding header will use gzip as default (configurable).
+Missing, empty or '*' Accept-Encoding header will use gzip as default
+(you can alter it in config).
+
+CUSTOM HANDLERS
+
+A custom handler must be invoked with two arguments,
+   (ServerRequestInterface) request,
+   (ResponseInterface)  response
+and will have access to all request/response methods.
+
+All handlers (but final handler) must return (array)
+   (ServerRequestInterface) request,
+   (ResponseInterface)  response.
 
 Review TemplateHandler.php for how to implement custom handlers.
 
@@ -223,8 +262,18 @@ CONFIGURATION
 
 Here are a short summary of configuration options:
 
+- correlation-id
+  unique (session) id (will otherwise be set automatically)
+
 - baseUri
   part of request target (uri) to eliminate to match service uri
+
+- disallow
+  initial reject of non-accepted request methods
+
+- debug
+  using builtin log debug or not
+  (requires a logger)
 
 - cors
   config for the the builtin CorsHandler (Cross-Origin Resource Sharing)
@@ -233,19 +282,17 @@ Here are a short summary of configuration options:
 - serializing and en/decoding handlers adaption (opt)
   review cfg/cfg.56.cte.php
 
-- disallow
-  initial reject of non-accepted request methods
-
-- debug
-  using builtin log debug or not
-  (requires logging is set)
-
 - services
   attaching rest service definition(s)
   see TemplateService.php
 
 - handlers
   attaching custom handler(s)
+  see TemplateHandler.php
+
+- final handler
+  attaching a final handler, exec after return reponse is fired off.
+  Any return value is ignored.
   see TemplateHandler.php
 
 Review cfg/cfg.RestServer.php for general restServer configuration.
@@ -274,7 +321,7 @@ See config (above) for invoke of debugging.
 
 You can set the logger using static method:
 
-restServer::setLogger( $logger );
+RestServer::setLogger( $logger );
 
 A handler or service callback can invoke the logger
 
@@ -289,11 +336,11 @@ if ( ! empty( $logger ) && method_exists( $logger, $prio )) {
 RESTSERVER METHODS
 ------------------
 
-restServer constructor
 restServer::__construct()
 restServer::__construct( config )
 
   config : array
+  restServer constructor
   see cfg/cfg.RestServer.php
 
 
@@ -301,12 +348,20 @@ restServer::setConfig( config )
 
   config : array
   throws InvalidArgumentException
-    (if handlers or services is attached from config)
+    (for handlers or services set upp and attached in config)
   see cfg/cfg.RestServer.php
+
 
 restServer::addHandler( handler )
 
-  handler : custom handler as described in TemplateHandler.php
+  handler : one handler or (array) handlers
+            custom handlers are described in TemplateHandler.php
+  throws InvalidArgumentException on error
+
+
+restServer::addFinalHandler( handler )
+  handler : one handler
+            custom handlers are described in TemplateHandler.php
   throws InvalidArgumentException on error
 
 
@@ -351,6 +406,6 @@ NEXT TO COME
 ---------------
 
 In the plans are handlers;
-  AuthenticationHandler (basic),
+  AuthenticationHandler (Basic/Digest),
   extended CorsHandler,
   IPnumHandler.

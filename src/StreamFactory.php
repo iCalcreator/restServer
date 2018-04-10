@@ -27,62 +27,42 @@
  *           If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace Kigkonsult\RestServer\Handlers\EncodingHandlers;
+namespace Kigkonsult\RestServer;
 
-use Kigkonsult\RestServer\Handlers\Exceptions\ZlibErrorException;
+use Psr\Http\Message\StreamInterface;
+use RuntimeException;
+use Zend\Diactoros\Stream;
 
-/**
- * GzipHandler manages 'gzip' decode/encode operations
- */
-class GzipHandler implements EncodingInterface
+class StreamFactory
 {
     /**
-     * Uncompress gzipped data
-     *
-     * @param string $data
-     * @param int   $level
-     * @param int   $options
-     * @return string
-     * @static
-     * @throws ZlibErrorException
+     * @var string $streamWrapper
      */
-    public static function deCode(
-        $data,
-        $level = null,
-        $options = null
-    ) {
-        $uncompressed = @\gzdecode( $data );
-        if ( false !== $uncompressed ) {
-            return $uncompressed;
-        }
-        throw new ZlibErrorException( __METHOD__, 500 );
-    }
+    private static $streamWrapper = 'php://memory';
 
     /**
-     * Compress data as gzip
-     *
-     * @param mixed $data
-     * @param int   $level
-     * @param int   $options
-     * @return string
-     * @static
-     * @throws ZlibErrorException
+     * @var string $mode
      */
-    public static function enCode(
-        $data,
-        $level = null,
-        $options = null
+    private static $mode = 'wb+';
+
+    /**
+     * Return a new stream, opt. from a string
+     *
+     * @param null|string $content
+     * @return StreamInterface
+     * @throws RuntimeException on stream write error
+     * @static
+     */
+    public static function createStream(
+        $content = null
     ) {
-        if ( empty( $level )) {
-            $level = -1;
+        $stream = new Stream(
+            self::$streamWrapper,
+            self::$mode
+        );
+        if ( null !== $content ) {
+            $stream->write( $content );
         }
-        if ( empty( $options )) {
-            $options = FORCE_GZIP;
-        }
-        $compressed = @\gzencode( $data, $level, $options );
-        if ( false !== $compressed ) {
-            return $compressed;
-        }
-        throw new ZlibErrorException( __METHOD__, 500 );
+        return $stream;
     }
 }

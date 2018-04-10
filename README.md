@@ -1,15 +1,11 @@
 restServer - rest services made easy
-====================================
+------------------------------------
 
 restServer provides
 
- * a rest server and API for your application
-
-The library is based on
-
- * PSR HTTP message and util interfaces
- * zend-diactoros - server implementation
- * FastRoute - Fast request router for PHP
+ * a PSR HTTP message rest server
+ * builtin serializers and decoders 
+ * API for your application
 
 Install
 -------
@@ -61,12 +57,12 @@ $RestServer = new RestServer();
 
 $attachRestServiceCallback = $RestServer->getAttachRestServiceCallback();
 
-class applicationClass2
+class ApplicationClass2
 {
     public function registerAsRestService(
-        $callback
+        $attachRestServiceCallback
     ) {
-        $callback(
+        $attachRestServiceCallback(
             RequestMethodHandler::METHOD_GET,
             '/',
             [$this, 'action']
@@ -80,8 +76,9 @@ class applicationClass2
         return $response->withRawBody( ['msg' => 'Hello world'] );
     }
 }
-$applicationClass2 = new applicationClass2();
-$applicationClass2->registerAsRestService( $attachRestServiceCallback );
+
+$ApplicationClass2 = new ApplicationClass2();
+$ApplicationClass2->registerAsRestService( $attachRestServiceCallback );
 
 $RestServer->run();
 ```
@@ -97,8 +94,9 @@ Handlers
 
 restServer have builtin handlers managing messages serializing, en-/decoding
 and Cross-Origin Resource Sharing.
-As well as rest service definitions, you can attach custom
-request message handler(s), invoked before any operation callback.
+Aside from rest service definitions, you can attach custom
+request message handler(s), invoked before any operation callback 
+as well as (a single) final handler, invoked after response is returned.
 
 Documentation
 -------------
@@ -122,7 +120,7 @@ Credits and base software information
 
 Built status
 ------------
-Dev 0.8.0
+Dev 0.9.23
 
 [PSR HTTP message interfaces]: https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-7-http-message.md
 [PSR HTTP message Util interfaces]: https://github.com/php-fig/http-message-util

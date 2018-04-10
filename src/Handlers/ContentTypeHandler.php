@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -30,8 +30,9 @@
 namespace Kigkonsult\RestServer\Handlers;
 
 use Kigkonsult\RestServer\RestServer;
+use Kigkonsult\RestServer\StreamFactory;
 use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use Kigkonsult\RestServer\ResponseInterface;
 use Kigkonsult\RestServer\Handlers\Exceptions\simplexmlLoadErrorException;
 use Kigkonsult\RestServer\Handlers\Exceptions\LIBXMLFatalErrorException;
 use Kigkonsult\RestServer\Handlers\Exceptions\jsonErrorException;
@@ -64,17 +65,17 @@ use Exception;
 class ContentTypeHandler extends AbstractCteHandler
 {
     /**
-     * Class constants, headers, cfg keys etc
+     * Class constants, headers
      */
-    const ACCEPT = 'Accept';
+    const ACCEPT             = 'Accept';
+    const CONTENTTYPE        = 'Content-Type';
+    const CONTENTLENGTH      = 'Content-Length';
 
-    const CONTENTTYPE = 'Content-Type';
-
-    const CONTENTLENGTH = 'Content-Length';
-
+    /**
+     * Class constants, cfg keys
+     */
     const UNSERIALIZEOPTIONS = 'unSerializeOptions';
-
-    const SERIALIZEOPTIONS = 'serializeOptions';
+    const SERIALIZEOPTIONS   = 'serializeOptions';
 
     /**
      * @var string[] $types  array *(type => Handler)
@@ -169,12 +170,11 @@ class ContentTypeHandler extends AbstractCteHandler
                 $request,
                 $response,
             ];
-        }
+        } // end if
         $config  = $request->getAttribute( RestServer::CONFIG, [] );
         $fallback = ( isset( $config[self::ACCEPT][self::FALLBACK] ))
                            ? $config[self::ACCEPT][self::FALLBACK]
                            : \array_keys( self::$types)[0];
-
         return self::validateHeader(
             $request,
             $response,
@@ -202,7 +202,7 @@ class ContentTypeHandler extends AbstractCteHandler
                 $request,
                 $response,
             ];
-        }
+        } // end if
 
         $body = $request->getParsedBody();
         if ( ! empty( $body ) && ( \is_array( $body ) || \is_object( $body ))) {
@@ -210,7 +210,7 @@ class ContentTypeHandler extends AbstractCteHandler
                 $request,
                 $response,
             ];
-        }
+        } // end if
 
         $stream = $request->getBody();
         if ( empty( $stream->getSize())) {
@@ -218,7 +218,7 @@ class ContentTypeHandler extends AbstractCteHandler
                 $request,
                 $response,
             ];
-        }
+        } // end if
 
         $config  = $request->getAttribute( RestServer::CONFIG, [] );
         $options = ( isset( $config[$contentType][self::UNSERIALIZEOPTIONS] ))
@@ -232,7 +232,7 @@ class ContentTypeHandler extends AbstractCteHandler
                 $body = self::$types[$contentType]::unSerialize( $body, $options );
             }
             $request  = $request->withParsedBody( $body )
-                                ->withBody( RestServer::getNewStream());
+                                ->withBody( StreamFactory::createStream());
         } catch ( LIBXMLFatalErrorException $e ) {
             $error = $e;
         } catch ( simplexmlLoadErrorException $e ) {
@@ -285,7 +285,7 @@ class ContentTypeHandler extends AbstractCteHandler
         } // end if
 
         if ( false === $contentType ) { // no request content-type
-            $response = self::setResponseBody( $response, $body, $error );
+            $response2 = self::setResponseBody( $response, $body, $error );
             if ( $error instanceof Exception ) {
                 return self::doLogReturn(
                     $request->withAttribute( RestServer::ERROR, true ),
@@ -294,7 +294,9 @@ class ContentTypeHandler extends AbstractCteHandler
                     RestServer::WARNING
                 );
             }
-
+            else {
+                $response = $response2;
+            }
             return [
                 $request,
                 $response,
@@ -303,7 +305,7 @@ class ContentTypeHandler extends AbstractCteHandler
 
         $response = $response->withHeader( self::CONTENTTYPE, $contentType );
         if ( empty( self::$types[$contentType] )) { // no serializing for Content-Type
-            $response = self::setResponseBody( $response, $body, $error );
+            $response2 = self::setResponseBody( $response, $body, $error );
             if ( $error instanceof Exception ) {
                 return self::doLogReturn(
                     $request->withAttribute( RestServer::ERROR, true ),
@@ -311,6 +313,9 @@ class ContentTypeHandler extends AbstractCteHandler
                     $error,
                     RestServer::WARNING
                 );
+            }
+            else {
+                $response = $response2;
             }
             return [
                 $request,
@@ -324,13 +329,13 @@ class ContentTypeHandler extends AbstractCteHandler
                           : null;
         $error = false;
         try {
-            if (empty($body)) {
+            if ( empty( $body )) {
                 $body = null;
-            } elseif (0 !== $body) {
-                $body = self::$types[$contentType]::serialize($body, $options);
+            } elseif ( 0 !== $body ) {
+                $body = self::$types[$contentType]::serialize( $body, $options );
             }
-            $response = $response->withRawBody(null)
-                ->withBody(RestServer::getNewStream($body));
+            $response = $response->withRawBody( null )
+                                 ->withBody( StreamFactory::createStream( $body ));
         } catch ( LIBXMLFatalErrorException $e ) {
             $error = $e;
         } catch ( simplexmlLoadErrorException $e ) {
@@ -349,8 +354,7 @@ class ContentTypeHandler extends AbstractCteHandler
                 $error,
                 RestServer::WARNING
             );
-        }
-
+        } // end if
         return [
             $request,
             $response,
@@ -399,7 +403,7 @@ class ContentTypeHandler extends AbstractCteHandler
     ) {
         $error = false;
         try {
-            $response = $response->withBody( RestServer::getNewStream( $body ))
+            $response = $response->withBody( StreamFactory::createStream( $body ))
                                  ->withRawBody( null );
         } catch ( RuntimeException $e ) {
             $error = $e;
@@ -423,7 +427,7 @@ class ContentTypeHandler extends AbstractCteHandler
         ResponseInterface      $response,
                                $force = null
     ) {
-        if ( (bool) $force ) {
+        if ((bool) $force ) {
             $response = $response->withHeader(self::CONTENTTYPE, self::$OptionsContentType );
         }
         return [

@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -54,14 +54,30 @@ class ConfigTest extends TestCase
         $config1 = [];
 
         /**
-         * include RequestMethodHandler config
+         * include RestServer config
          */
-//      $config1[RequestMethodHandler::REQUESTMETHOD] = include './cfg/cfg.1.RequestMethod.php';
-
+        $config1[RestServer::INIT]          = \microtime( true );
+        $config1[RestServer::CORRELATIONID] = strtoupper( bin2hex( openssl_random_pseudo_bytes( 16) ));
+        $config1[RestServer::BASEURI]       = 'index.php';
+        $config1[RestServer::DISALLOW]      = [
+            RequestMethodHandler::METHOD_OPTIONS,
+            RequestMethodHandler::METHOD_HEAD,
+        ];
         /**
          * include CorsHandler config
          */
-        $config1[CorsHandler::CORS] = include './cfg/cfg.2.cors.php';
+        $config1[CorsHandler::CORS] = [
+            RestServer::IGNORE      => true,
+            CorsHandler::ERRORCODE1 => 400,
+            CorsHandler::ERRORCODE2 => 403,
+            CorsHandler::ERRORCODE3 => 406,
+            CorsHandler::ERRORCODE4 => 406,
+            RestServer::ALLOW       => ['*'],
+            CorsHandler::ACCESSCONTROLALLOWHEADERS     => ['x-header'],
+            CorsHandler::ACCESSCONTROLMAXAGE           => 200,
+            CorsHandler::ACCESSCONTROLEXPOSEHEADERS    => ['x-header'],
+            CorsHandler::ACCESSCONTROLALLOWCREDENTIALS => true,
+        ];
 
         /**
          * include ContentTypeHandler/EncodingHandler config
@@ -83,6 +99,18 @@ class ConfigTest extends TestCase
                 $this->assertTrue( isset( $config2[RequestMethodHandler::REQUESTMETHOD][RestServer::ALLOW] ));
                 $this->assertEquals(      $config2[RequestMethodHandler::REQUESTMETHOD][RestServer::ALLOW], [ RequestMethodHandler::AST ] );
          */
+        /**
+         * test RestServer config
+         */
+        $this->assertTrue( isset( $config2[RestServer::INIT] ));
+        $this->assertEquals( 'double', gettype( $config2[RestServer::INIT] ));
+        $this->assertTrue( isset( $config2[RestServer::CORRELATIONID] ));
+        $this->assertEquals( 'string', gettype( $config2[RestServer::CORRELATIONID] ));
+        $this->assertTrue( isset( $config2[RestServer::BASEURI] ));
+        $this->assertEquals( 'string', gettype( $config2[RestServer::BASEURI] ));
+        $this->assertTrue( isset( $config2[RestServer::DISALLOW] ));
+        $this->assertEquals( 'array', gettype( $config2[RestServer::DISALLOW] ));
+
         /**
          * test CorsHandler config
          */

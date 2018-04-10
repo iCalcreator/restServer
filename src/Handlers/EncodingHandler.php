@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -30,8 +30,9 @@
 namespace Kigkonsult\RestServer\Handlers;
 
 use Kigkonsult\RestServer\RestServer;
+use Kigkonsult\RestServer\StreamFactory;
 use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use Kigkonsult\RestServer\ResponseInterface;
 use Kigkonsult\RestServer\Handlers\Exceptions\zlibErrorException;
 use RuntimeException;
 use InvalidArgumentException;
@@ -72,20 +73,26 @@ use Exception;
 class EncodingHandler extends AbstractCteHandler
 {
     /**
-     * Class constants
+     * Class constants, headers
      */
     const CONTENTENCODING = 'Content-Encoding';
-
     const ACCEPTENCODING  = 'Accept-Encoding';
 
+    /**
+     * Class constants, header value
+     */
     const IDENTITY        = 'identity';
 
+    /**
+     * Class constants, decode parameter config keys
+     */
     const DECODELEVEL     = 'deCodeLevel';
-
     const DECODEOPTIONS   = 'deCodeOptions';
 
+    /**
+     * Class constants, encode parameter config keys
+     */
     const ENCODELEVEL     = 'enCodeLevel';
-
     const ENCODEOPTIONS   = 'enCodeOptions';
 
     /**
@@ -188,25 +195,25 @@ class EncodingHandler extends AbstractCteHandler
             ];
         }
 
-        $config = $request->getAttribute( RestServer::CONFIG, [] );
-        $level  = ( isset( $config[$encoding][self::DECODELEVEL] ))
-                        ? $config[$encoding][self::DECODELEVEL]
-                        : null;
+        $config  = $request->getAttribute( RestServer::CONFIG, [] );
+        $level   = ( isset( $config[$encoding][self::DECODELEVEL] ))
+                          ? $config[$encoding][self::DECODELEVEL]
+                          : null;
         $options = ( isset( $config[$encoding][self::DECODEOPTIONS] ))
                           ? $config[$encoding][self::DECODEOPTIONS]
                           : null;
-        $error = false;
+        $error   = false;
         try {
             $stream->rewind();
-            $body     = $stream->getContents();
+            $body  = $stream->getContents();
             if ( ! empty( self::$types[$encoding] )) {
                 $body = self::$types[$encoding]::deCode( $body, $level, $options );
             }
             if ( \is_array( $body ) || \is_object( $body )) {
                 $request = $request->withParsedBody( $body )
-                                   ->withBody( RestServer::getNewStream());
+                                   ->withBody( StreamFactory::createStream());
             } else {
-                $request = $request->withBody( RestServer::getNewStream( $body ));
+                $request = $request->withBody( StreamFactory::createStream( $body ));
             }
         } catch ( zlibErrorException $e ) {
             $error = $e;
@@ -275,7 +282,7 @@ class EncodingHandler extends AbstractCteHandler
                 $body = self::$types[$encoding]::enCode( $body, $level, $options );
             }
             $response = $response->withRawBody( null )
-                                 ->withBody( RestServer::getNewStream( $body ));
+                                 ->withBody( StreamFactory::createStream( $body ));
         } catch ( RuntimeException $e ) {
             $error = $e;
         } catch ( zlibErrorException $e ) {

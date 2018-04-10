@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.4
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -31,49 +31,53 @@ namespace Kigkonsult\RestServer;
 
 use Kigkonsult\RestServer\Handlers\RequestMethodHandler;
 use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use Zend\Diactoros\Server;
-use Zend\Diactoros\Stream;
 use Zend\Diactoros\Response\SapiStreamEmitter;
 use RuntimeException;
 use InvalidArgumentException;
 use Exception;
 use FastRoute\RouteCollector;
 use FastRoute\Dispatcher;
+use Kigkonsult\RestServer\Handlers\LogUtilHandler;
 
 class RestServer
 {
     /**
-     * Class constants, headers, cfg keys etc
+     * Class constants, config keys
      */
-    const URI              = 'uri';
-
-    const METHOD           = 'method';
-
-    const CALLBACK         = 'callback';
-
+    const ALLOW            = 'allow';
+    const BASEURI          = 'baseUri';
+    const CONFIG           = 'config';
+    const CORRELATIONID    = 'correlationId';
+    const DISALLOW         = 'disallow';
+    const FINALHANDLER     = 'finalHandler';
     const HANDLERS         = 'handlers';
-
+    const IGNORE           = 'ignore';
+    const INIT             = 'init';
     const SERVICES         = 'services';
 
-    const CONFIG           = 'config';
-
-    const ALLOW            = 'allow';
-
-    const DISALLOW         = 'disallow';
-
-    const INIT             = 'init';
-
-    const BASEURI          = 'baseUri';
-
+    /**
+     * Class constants, request attribute keys
+     */
     const REQUESTTARGET    = 'requestTarget';
-
     const REQUESTMETHODURI = 'requestMethodUri';
 
     /**
-     * @var string
+     * Class constants, service definition keys
      */
-    private static $version = '0.8.4';
+    const URI              = 'uri';
+    const METHOD           = 'method';
+    const CALLBACK         = 'callback';
+
+    /**
+     * @var string version
+     */
+    private static $version = '0.9.23';
+
+    /**
+     * @var string misc
+     */
+    private static $space   = ' ';
+    private static $slash   = '/';
 
     /**
      * Handler callbacks, called before routing
@@ -81,14 +85,15 @@ class RestServer
      * @var callable[]
      */
     private static $builtinPreHandlers = [
-        [ __NAMESPACE__ . '\\Handlers\\RequestMethodHandler', 'validateRequestMethod' ],
-        [ __NAMESPACE__ . '\\Handlers\\CorsHandler',          'validateCors' ],
-        [ __NAMESPACE__ . '\\Handlers\\EncodingHandler',      'validateRequestHeader' ],
-        [ __NAMESPACE__ . '\\Handlers\\ContentTypeHandler',   'validateRequestHeader' ],
-        [ __NAMESPACE__ . '\\Handlers\\ContentTypeHandler',   'validateResponseHeader' ],
-        [ __NAMESPACE__ . '\\Handlers\\EncodingHandler',      'validateResponseHeader' ],
-        [ __NAMESPACE__ . '\\Handlers\\EncodingHandler',      'deCode' ],
-        [ __NAMESPACE__ . '\\Handlers\\ContentTypeHandler',   'unSerialize' ],
+        [ __NAMESPACE__ . '\\Handlers\\RequestMethodHandler',  'validateRequestMethod' ],
+        [ __NAMESPACE__ . '\\Handlers\\CorsHandler',           'validateCors' ],
+//      [ __NAMESPACE__ . '\\Handlers\\AuthenticationHandler', 'validateAuthentication' ],
+        [ __NAMESPACE__ . '\\Handlers\\EncodingHandler',       'validateRequestHeader' ],
+        [ __NAMESPACE__ . '\\Handlers\\ContentTypeHandler',    'validateRequestHeader' ],
+        [ __NAMESPACE__ . '\\Handlers\\ContentTypeHandler',    'validateResponseHeader' ],
+        [ __NAMESPACE__ . '\\Handlers\\EncodingHandler',       'validateResponseHeader' ],
+        [ __NAMESPACE__ . '\\Handlers\\EncodingHandler',       'deCode' ],
+        [ __NAMESPACE__ . '\\Handlers\\ContentTypeHandler',    'unSerialize' ],
     ];
 
     /**
@@ -126,11 +131,14 @@ class RestServer
     private $config = [];
 
     /**
-     * An Server instance
-     *
-     * @var Server (Zend\Diactoros\Server)
+     * @var ServerRequestInterface
      */
-    private $server = null;
+    private $request;
+
+    /**
+     * @var ResponseInterface
+     */
+    private $response;
 
     /**
      * Callable pre service handlers, each with arguments ( ServerRequestInterface, ResponseInterface )
@@ -168,6 +176,13 @@ class RestServer
     private $noOfServices = 0;
 
     /**
+     * Callable final handler, with arguments ( ServerRequestInterface, ResponseInterface )
+     *
+     * @var callable[]
+     */
+    private $finalHandler = null;
+
+    /**
      * Class constructor
      *
      * @param array $config
@@ -185,33 +200,21 @@ class RestServer
         array $cookies = null,
         array $files   = null
     ) {
-        if ( null === $config ) {
-            $config = [];
-        }
-        $this->config        = $config + [ self::INIT => \microtime( true ) ];
-        $request             = ServerRequestFactory::fromGlobals( $server, $query, $body, $files );
-        $response            = new Response( self::getNewStream(), 200 );
+        $this->initConfig( $config );
+        $this->request       = ServerRequestFactory::fromGlobals( $server, $query, $body, $cookies, $files );
+        $this->response      = new Response( StreamFactory::createStream(), 200 );
         $this->preHandlers   = self::$builtinPreHandlers;
         $this->noPreHandlers = \count( $this->preHandlers );
         $this->postHandlers  = self::$builtinPostHandlers;
-        if ( isset( $this->config[self::HANDLERS] ) ) {
-            list( $request, $response ) = $this->addHandlersFromConfig( $request, $response );
+        $error = null;
+        try {
+            $this->addHandlersFromConfig( $this->config );
+            $this->attachRestServicesFromConfig( $this->config );
+            $this->addFinalHandlerFromConfig( $this->config );
         }
-        if ( ( false === $request->getAttribute( self::ERROR, false ) ) &&
-            isset( $this->config[self::SERVICES] ) ) {
-            list( $request, $response ) = $this->attachRestServicesFromConfig( $request, $response );
+        catch ( Exception $e ) {
+            $this->request = $this->request->setAttribute( self::ERROR, $e );
         }
-        $this->server = new Server(
-            function (
-                ServerRequestInterface $request,
-                ResponseInterface $response,
-                $done
-            ) {
-                return $this->serverCallback( $request, $response, $done );
-            },
-            $request,
-            $response
-        );
     }
 
     /**
@@ -222,12 +225,14 @@ class RestServer
         unset(
             $this->startTime,
             $this->config,
-            $this->server,
+            $this->request,
+            $this->response,
             $this->preHandlers,
             $this->noPreHandlers,
             $this->postHandlers,
             $this->services,
-            $this->noServices
+            $this->noServices,
+            $this->finalHandler
         );
     }
 
@@ -236,10 +241,17 @@ class RestServer
      */
     public function run()
     {
-        static $FMT2 = 'time :%01.6f';
-        $this->server->setEmitter( new SapiStreamEmitter() );
-        $this->server->listen();
-        self::log( \sprintf( $FMT2, ( \microtime( true ) - $this->config[self::INIT] ) ), self::INFO );
+        static $FMT2 = '%s time :%01.6f';
+        $response = $this->processRequest();
+        $emitter  = new SapiStreamEmitter();
+        $emitter->emit( $response );
+        $this->execFinalHandler( $response );
+        $msg      = \sprintf(
+            $FMT2,
+            $this->config[self::CORRELATIONID],
+            \microtime( true ) - $this->config[self::INIT]
+        );
+        self::log( $msg,self::INFO );
     }
 
     /**
@@ -252,173 +264,165 @@ class RestServer
     public function setConfig(
         array $config
     ) {
-        $config[self::INIT] = $this->config[self::INIT];
+        foreach( [ self::INIT, self::CORRELATIONID ] as $key )
+            $config[$key] = $this->config[$key];
         $this->config       = $config;
-        if ( isset( $config[self::HANDLERS] ) ) {
-            $this->addHandler( $this->config[self::HANDLERS] );
-            unset( $this->config[self::HANDLERS] );
-        }
-        if ( isset( $config[self::SERVICES] ) ) {
-            foreach ( $this->config[self::SERVICES] as $x => $service ) {
-                $this->attachRestService( $service );
-            }
-            unset( $this->config[self::SERVICES] );
-        } // end if
+        $this->addHandlersFromConfig( $config );
+        $this->attachRestServicesFromConfig( $config );
+        $this->addFinalHandlerFromConfig( $config );
         return $this;
     }
 
     /**
-     * Allow access to private properties
+     * Init config
      *
-     * @param string $name
-     * @return mixed
-     */
-    public function __get(
-        $name
-    ) {
-        if ( \property_exists( $this, $name ) ) {
-            return $this->{$name};
-        }
-        return null;
-    }
-
-    /**
-     * Server callback, exec pre/POST-handlers, perform routing and exec found method/service callback
-     *
-     * @param ServerRequestInterface $request
-     * @param ResponseInterface      $response
-     * @param null|callable          $done
-     * @return ResponseInterface
-     */
-    public function serverCallback(
-        ServerRequestInterface $request,
-        ResponseInterface $response,
-        $done = null
-    ) {
-        // initialize server
-        list( $request, $response ) = $this->setUp( $request, $response );
-        // exec preHandlers
-        list( $request, $response ) = $this->execPreHandlers( $request, $response );
-        // debug ??
-        if ( isset( $this->config[self::DEBUG] ) ) {
-            list( $request, $response ) = self::$debugHandlers[0]( $request, $response );
-        }
-        // find and exec service callback
-        if (( false === $request->getAttribute( self::ERROR, false )) &&
-            ( RequestMethodHandler::METHOD_OPTIONS != $request->getMethod())) {
-            $orgMethod = $request->getMethod();
-            if ( RequestMethodHandler::METHOD_HEAD == $orgMethod ) {
-                $request = $request->withMethod( RequestMethodHandler::METHOD_GET );
-            }
-            try {
-                $serviceInfo = $this->getServiceInfo( $request );
-            } catch ( Exception $e ) { // & RuntimeException
-                self::log( $e, self::ERROR );
-                self::log( $request, self::ERROR );
-
-                return $response->withStatus( $e->GetCode() );
-            }
-            $response = $this->execService( $request, $response, $serviceInfo );
-
-            if ( RequestMethodHandler::METHOD_HEAD == $orgMethod ) {
-                $response = $response->withRawBody( null );
-            }
-        } // end if
-        // exec postHandlers
-        list( $request, $response ) = $this->execPostHandlers( $request, $response );
-        if ( isset( $this->config[self::DEBUG] ) ) {
-            list( $request, $response ) = self::$debugHandlers[1]( $request, $response );
-        }
-        return $response;
-    }
-
-    /**
-     * Set up server
-     *
-     * @param ServerRequestInterface $request
-     * @param ResponseInterface      $response
-     * @return array [ ServerRequestInterface, ResponseInterface ]
+     * @param null|array $config
      * @access private
      */
-    private function setUp(
-        ServerRequestInterface $request,
-        ResponseInterface $response
+    private function initConfig(
+        $config = null
     ) {
-        // catch init request error
-        $error = $request->getAttribute( self::ERROR, false );
+        if( empty( $config ))
+            $config = [];
+        if( ! isset( $config[self::INIT] ))
+            $config[self::INIT] = \microtime( true );
+        if( ! isset( $config[self::CORRELATIONID] ))
+            $config[self::CORRELATIONID] = strtoupper( bin2hex( openssl_random_pseudo_bytes( 16) ));
+        $this->config           = $config;
+    }
+
+    /**
+     * Exec pre/post-handlers, init and exec found method/service callback
+     *
+     * @return ResponseInterface
+     */
+    public function processRequest()
+    {
+        if ( $this->hasInitRequestError()) {
+            $this->response = $this->response->withStatus( 500 );
+        }
+        $this->request = $this->addRequestAttributes();
+        $this->execPreHandlers();
+        if ( isset( $this->config[self::DEBUG] )) {
+            self::$debugHandlers[0]( $this->request );
+        }
+        if ( false === $this->request->getAttribute( self::ERROR, false )) {
+            $this->response = $this->processRestServicesDefinitions();
+        }
+        $this->execPostHandlers();
+        if ( isset( $this->config[self::DEBUG] )) {
+            self::$debugHandlers[1](
+                $this->request,
+                $this->response
+            );
+        }
+        return $this->response;
+    }
+
+    /**
+     * Catch init request error
+     *
+     * @return bool
+     * @access private
+     */
+    private function hasInitRequestError()
+    {
+        $error = $this->request->getAttribute( self::ERROR, false );
         if ( $error instanceof Exception ) {
-            self::log( $error->getMessage(), self::ERROR );
-            self::log( $error, self::ERROR );
-            self::log( $request, self::ERROR );
+            $corrId = $this->config[self::CORRELATIONID] . self::$space;
+            self::log( $corrId . LogUtilHandler::jTraceEx( $error ), self::ERROR );
+            self::log( $corrId . LogUtilHandler::getRequestToString( $this->request ), self::ERROR );
+            $this->response     = $this->response->withStatus( 500 );   // Internal server error...
             $this->preHandlers  = [];
             $this->services     = [];
             $this->postHandlers = [];
-
-            return [
-                $request,
-                $response->withStatus( 500 ),   // Internal server error...
-            ];
+            return true;
         } // end if
-        // set (array) attribute from each service method & uri
-        $methods = [];
-        foreach ( $this->services as $method => $uriServices ) {
+        return false;
+    }
+
+    /**
+     * Set request attributes
+     *
+     * add services method & uri array
+     * add config to attributes
+     * add (real) request target to attributes
+     * $return ServerRequestInterface
+     * @access private
+     */
+    private function addRequestAttributes()
+    {
+        return $this->request->withAttribute( self::REQUESTMETHODURI,
+                                              self::extractMethodAndUriFromServices( $this->services ))
+                             ->withAttribute( self::CONFIG,
+                                              $this->config )
+                             ->withAttribute( self::REQUESTTARGET,
+                                              $this->getUriFromRequestTarget());
+    }
+
+    /**
+     * Perform closing actions, call finalHandler
+     *
+     * @param ResponseInterface
+     */
+    public function execFinalHandler(
+        ResponseInterface $response
+    ) {
+        if( ! empty( $this->finalHandler )) {
+            $handler = $this->finalHandler;
+            $handler( $this->request, $response );
+        }
+    }
+
+    /**
+     * Return services method & uri in array
+     *
+     * @param array $services
+     * @return array
+     * @access private
+     */
+    private function extractMethodAndUriFromServices(
+        array $services
+    ) {
+        $methodUriArr = [];
+        foreach ( $services as $method => $uriServices ) {
             foreach ( $uriServices as $uri => $callback ) {
-                if ( empty( $callback ) ) {
+                if ( empty( $callback )) {
                     continue;
                 }
-                if ( ! isset( $methods[$method] )) {
-                    $methods[$method] = [];
+                if ( ! isset( $methodUriArr[$method] )) {
+                    $methodUriArr[$method] = [];
                 }
-                if ( ! \in_array( $callback[self::URI], $methods[$method] )) {
-                    $methods[$method][] = $uri;
+                if ( ! \in_array( $callback[self::URI], $methodUriArr[$method] )) {
+                    $methodUriArr[$method][] = $uri;
                 }
             }
         } // end foreach
-        $request = $request->withAttribute( self::REQUESTMETHODURI, $methods );
-        // add config to attributes
-        $request = $request->withAttribute( self::CONFIG, $this->config );
-        // add (real) request target to attributes
-        $request = $request->withAttribute( self::REQUESTTARGET, $this->getUriFromRequestTarget( $request ) );
-        return [
-            $request,
-            $response,
-        ];
+        return $methodUriArr;
     }
 
     /**
      * Add handlers from config
      *
-     * @param ServerRequestInterface $request
-     * @param ResponseInterface      $response
-     * @return array [ ServerRequestInterface, ResponseInterface ]
+     * @param array $config
      * @access private
+     * @throws InvalidArgumentException
      */
     private function addHandlersFromConfig(
-        ServerRequestInterface $request,
-        ResponseInterface $response
+        array $config
     ) {
-        try {
-            $this->addHandler( $this->config[self::HANDLERS] );
-        } catch ( Exception $e ) { // & InvalidArgumentException
-            return [
-                $request->withAttribute( self::ERROR, $e ),
-                $response->withStatus( 500 ),
-            ];
+        if ( isset( $config[self::HANDLERS] )) {
+            $this->addHandler( $config[self::HANDLERS] );
         }
         unset( $this->config[self::HANDLERS] );
-
-        return [
-            $request,
-            $response,
-        ];
     }
 
     /**
      * Add (callable) pre service handler(s)
      *
-     * Each handler with arguments (ResponseInterface $request, ServerRequestInterface $response)
-     * and MUST return [ ResponseInterface, ServerRequestInterface ]
-     * @param callable|callable[]| $handler one or more callable
+     * Each handler MUST have arguments (ServerRequestInterface $request, ResponseInterface $response)
+     * and MUST return [ ServerRequestInterface, ResponseInterface ]
+     * @param callable|callable[] $handler one or more callable
      * @return static
      * @throws InvalidArgumentException on not callable handler
      */
@@ -427,15 +431,15 @@ class RestServer
     ) {
         static $FMT = '%s : Handler #%d is not callable';
         if ( ! \is_array( $handler ) ||
-            ( 2 == \count( $handler ) ) &&
-            \is_callable( $handler, true ) ) {
+            ( 2 == \count( $handler )) &&
+            \is_callable( $handler, true )) {
             $handler = [ $handler ];
         } // end if
         $cnt = $this->noPreHandlers - \count( self::$builtinPreHandlers );
         foreach ( $handler as $h ) {
             $cnt += 1;
-            if ( ! \is_callable( $h, true ) ) {
-                throw new InvalidArgumentException( \sprintf( $FMT, __METHOD__, $cnt ) );
+            if ( ! \is_callable( $h, true )) {
+                throw new InvalidArgumentException( \sprintf( $FMT, __METHOD__, $cnt ));
             }
             $this->noPreHandlers += 1;
             $this->preHandlers[] = $h;
@@ -444,110 +448,150 @@ class RestServer
     }
 
     /**
-     * Call all added pre service callback handlers
+     * Exec all added pre service handlers
      *
      * Break if a handler request has return attribute error=true
-     * will also skip service mgnt
-     * @param ServerRequestInterface $request
-     * @param ResponseInterface      $response
-     * @return array [ ServerRequestInterface, ResponseInterface ]
+     * will also skip service management
      * @access private
      */
     private function execPreHandlers(
-        ServerRequestInterface $request,
-        ResponseInterface $response
     ) {
         foreach ( $this->preHandlers as $x => $handler ) {
-            list( $request, $response ) = $handler( $request, $response );
-            if ( false !== $request->getAttribute( self::ERROR, false ) ) {
+            list( $this->request, $this->response ) = $handler( $this->request, $this->response );
+            if ( false !== $this->request->getAttribute( self::ERROR, false )) {
                 $this->preHandlers = [];
-                $this->services    = [];
-
-                return [
-                    $request,
-                    $response,
-                ];
-            } //end if
-            if ( ( 1 == $x ) &&
-                ( RequestMethodHandler::METHOD_OPTIONS == $request->getMethod() ) ) {
+                $this->services    = []; // skip services
+                return;
+                break;
+            } // end if
+            if (( 1 == $x ) && // i.e. CorsHandler
+                ( RequestMethodHandler::METHOD_OPTIONS == $this->request->getMethod()) ) {
                 try {
-                    list( $request, $response ) = RequestMethodHandler::setOptionsResponsePayload( $request, $response );
+                    list(
+                        $this->request,
+                        $this->response
+                    ) = RequestMethodHandler::setOptionsResponsePayload(
+                            $this->request,
+                            $this->response
+                    );
                 } catch ( Exception $e ) {
-                    self::log( $e, self::ERROR );
-                    self::log( $request, self::ERROR );
-                    $request  = $request->withAttribute( self::ERROR, true );
-                    $response = $response->withStatus( $e->getCode() );
+                    $corrId = $this->config[self::CORRELATIONID] . self::$space;
+                    self::log( $corrId . LogUtilHandler::jTraceEx( $e ), self::ERROR );
+                    self::log( $corrId . LogUtilHandler::getRequestToString( $this->request ), self::ERROR );
+                    $this->request  = $this->request->withAttribute( self::ERROR, true );
+                    $this->response = $this->response->withStatus( $e->getCode());
                 }
                 $this->postHandlers = [];
-                $this->services = [];    // skip services
-                return [
-                    $request,
-                    $response,
-                ];
-            } //end if
+                $this->services     = []; // skip services
+                return;
+                break;
+            } // end if
         } // end foreach
-        return [
-            $request,
-            $response,
-        ];
     }
 
     /**
-     * Call post service callback handlers
+     * Exec post service handlers
      *
-     * @param ServerRequestInterface $request
-     * @param ResponseInterface      $response
-     * @return array [ ServerRequestInterface, ResponseInterface ]
      * @access private
      */
-    private function execPostHandlers(
-        ServerRequestInterface $request,
-        ResponseInterface $response
-    ) {
+    private function execPostHandlers()
+    {
         foreach ( $this->postHandlers as $x => $handler ) {
-            list( $request, $response ) = $handler( $request, $response );
-            if ( false !== $request->getAttribute( self::ERROR, false ) ) {
+            list( $this->request, $this->response ) = $handler( $this->request, $this->response );
+            if ( false !== $this->request->getAttribute( self::ERROR, false )) {
+                return;
                 break;
             }
         } // end foreach
-        return [
-            $request,
-            $response,
-        ];
     }
 
     /**
-     * Attach rest method/uri services from config
+     * Add finalHandler from config
      *
-     * @param ServerRequestInterface $request
-     * @param ResponseInterface      $response
-     * @return array [ ServerRequestInterface, ResponseInterface ]
+     * @param array $config
      * @access private
+     * @throws InvalidArgumentException
+     */
+    private function addFinalHandlerFromConfig(
+        array $config
+    ) {
+        if ( isset( $config[self::FINALHANDLER] )) {
+            $this->addFinalHandler( $config[self::FINALHANDLER] );
+        }
+        unset( $this->config[self::FINALHANDLER] );
+    }
+
+    /**
+     * Add (callable) final handler
+     *
+     * The handler MUST have arguments ( ServerRequestInterface $request, ResponseInterface $response)
+     * and No return
+     * @param callable $handler
+     * @return static
+     * @throws InvalidArgumentException on not callable handler
+     */
+    public function addFinalHandler(
+        $handler
+    ) {
+        static $FMT = 'finalHandler is not callable';
+        if ( ! \is_callable( $handler, true  )) {
+            throw new InvalidArgumentException( $FMT );
+        } // end if
+        $this->finalHandler = $handler;
+        return $this;
+    }
+
+    /**
+     * Attach rest service definitions from config
+     *
+     * @param array $config
+     * @access private
+     * @thows InvalidArgumentException
      */
     private function attachRestServicesFromConfig(
-        ServerRequestInterface $request,
-        ResponseInterface $response
+        array $config
     ) {
-        foreach ( $this->config[self::SERVICES] as $x => $service ) {
-            try {
+        if( isset( $config[self::SERVICES] )) {
+            foreach ( $config[self::SERVICES] as $x => $service ) {
                 $this->attachRestService( $service );
-            } catch ( Exception $e ) { // & InvalidArgumentException
-                return [
-                    $request->withAttribute( self::ERROR, $e ),
-                    $response->withStatus( 500 ),
-                ];
-            }
-        } // end foreach
+            } // end foreach
+        }
         unset( $this->config[self::SERVICES] );
-
-        return [
-            $request,
-            $response,
-        ];
     }
 
     /**
-     * Validates service
+     * Attach rest service definition ([method, uri, callback])
+     *
+     * @param array|string $serviceDef
+     * @param string       $uri
+     * @param string|array $callback
+     * @return static
+     * @throws InvalidArgumentException on service definition error
+     */
+    public function attachRestService(
+        $serviceDef,
+        $uri      = null,
+        $callback = null
+    ) {
+        if (( null !== $uri ) &&
+            ( null !== $callback )) {
+            $method     = $serviceDef;
+            $serviceDef = [];
+            $serviceDef[self::METHOD]   = $method;
+            $serviceDef[self::URI]      = $uri;
+            $serviceDef[self::CALLBACK] = $callback;
+        }
+        self::assertValidService( $serviceDef, ( 1 + $this->noOfServices ));
+        foreach ((array) $serviceDef[self::METHOD] as $x => $serviceMethod ) {
+            $this->noOfServices      += 1;
+            $serviceDef[self::METHOD] = $serviceMethod;
+            $this->services[$serviceMethod][$serviceDef[self::URI]] = $serviceDef;
+        }
+        return $this;
+    }
+
+    /**
+     * Validate service definition
      *
      * @param array $service
      * @param int   $cnt
@@ -566,53 +610,20 @@ class RestServer
         if ( ! \is_array( $service ) ||
             ! isset( $service[self::METHOD] ) ||
             ! isset( $service[self::URI] ) ||
-            ! isset( $service[self::CALLBACK] ) ) {
-            throw new InvalidArgumentException( \sprintf( $FMT1, $cnt ) );
+            ! isset( $service[self::CALLBACK] )) {
+            throw new InvalidArgumentException( \sprintf( $FMT1, $cnt ));
         }
-        if ( ! RequestMethodHandler::isValidRequestMethod( $service[self::METHOD] ) ) {
-            throw new InvalidArgumentException( \sprintf( $FMT2, $cnt, $service[self::METHOD] ) );
+        if ( ! RequestMethodHandler::isValidRequestMethod( $service[self::METHOD] )) {
+            throw new InvalidArgumentException( \sprintf( $FMT2, $cnt, $service[self::METHOD] ));
         }
-        if ( ! \is_callable( $service[self::CALLBACK], true ) ) {
-            throw new InvalidArgumentException( \sprintf( $FMT3, $cnt ) );
+        if ( ! \is_callable( $service[self::CALLBACK], true )) {
+            throw new InvalidArgumentException( \sprintf( $FMT3, $cnt ));
         }
-
         return true;
     }
 
     /**
-     * Attach rest service definition ([method, uri, callback])
-     *
-     * @param array|string $serviceDef
-     * @param string       $uri
-     * @param string|array $callback
-     * @return static
-     * @throws InvalidArgumentException on service definition error
-     */
-    public function attachRestService(
-        $serviceDef,
-        $uri = null,
-        $callback = null
-    ) {
-        if ( ( null !== $uri ) &&
-            ( null !== $callback ) ) {
-            $method = $serviceDef;
-            $serviceDef = [];
-            $serviceDef[self::METHOD] = $method;
-            $serviceDef[self::URI] = $uri;
-            $serviceDef[self::CALLBACK] = $callback;
-        }
-        self::assertValidService( $serviceDef, ( 1 + $this->noOfServices ) );
-        foreach ( (array)$serviceDef[self::METHOD] as $x => $serviceMethod ) {
-            $this->noOfServices += 1;
-            $serviceDef[self::METHOD] = $serviceMethod;
-            $this->services[$serviceMethod][$serviceDef[self::URI]] = $serviceDef;
-        }
-
-        return $this;
-    }
-
-    /**
-     * Return attachRestService callback
+     * Return (this) attachRestService as callback
      *
      * @return array  callback
      */
@@ -625,8 +636,7 @@ class RestServer
     }
 
     /**
-     * Detach rest service ([method, uri, callback])
-     * Can only detach attached services, no services origin from config
+     * Detach rest service definition ([method, uri, callback])
      *
      * @param string|string[] $method
      * @param string          $uri
@@ -637,8 +647,8 @@ class RestServer
         $uri
     ) {
         $success = false;
-        foreach ( (array)$method as $serviceMethod ) {
-            if ( isset( $this->services[$serviceMethod][$uri] ) ) {
+        foreach ((array) $method as $serviceMethod ) {
+            if ( isset( $this->services[$serviceMethod][$uri] )) {
                 unset( $this->services[$serviceMethod][$uri] );
                 $this->noOfServices -= 1;
                 $success             = true;
@@ -649,44 +659,53 @@ class RestServer
     }
 
     /**
-     * Return array of rest services ([method, uri, callback])
+     * Process rest service definitions
      *
-     * @return array
+     * @return ResponseInterface
      * @access private
      */
-    private function getServices()
+    private function processRestServicesDefinitions()
     {
-        $return = [];
-        foreach ( $this->services as $method => $uriServices ) {
-            foreach ( $uriServices as $uri => $callback ) {
-                if ( ! empty( $callback ) ) {
-                    $return[] = $callback;
-                }
+        if ( RequestMethodHandler::METHOD_OPTIONS != $this->request->getMethod()) {
+            $orgMethod = $this->request->getMethod();
+            if ( RequestMethodHandler::METHOD_HEAD == $orgMethod ) {
+                $this->request = $this->request->withMethod( RequestMethodHandler::METHOD_GET );
             }
-        }
-
-        return $return;
+            // find service definition callback
+            try {
+                $serviceInfo = $this->getServiceInfo();
+            } catch ( Exception $e ) { // & RuntimeException
+                $corrId = $this->config[self::CORRELATIONID] . self::$space;
+                self::log( $corrId . LogUtilHandler::jTraceEx( $e ), self::ERROR );
+                self::log( $corrId . LogUtilHandler::getRequestToString( $this->request ), self::ERROR );
+                return $this->response->withStatus( $e->GetCode());
+            }
+            // exec service definition callback
+            $this->response = $this->execServiceDefinitionCallback( $serviceInfo );
+            if ( RequestMethodHandler::METHOD_HEAD == $orgMethod ) {
+                $this->response = $this->response->withRawBody( null );
+            }
+        } // end if
+        return $this->response;
     }
 
     /**
-     * Return matched rest services ([method, uri, callback])
+     * Return serviceInfo for matched rest services ([method, uri, callback])
      *
-     * @param ServerRequestInterface $request
      * @return array
      * @access private
      * @throws RuntimeException on matching service error
      * @link https://github.com/nikic/FastRoute
      */
-    private function getServiceInfo(
-        ServerRequestInterface $request
-    ) {
-        static $FMT1 = 'NO services attached for #%d for %s and uri \'%s\', return status 500';
+    private function getServiceInfo()
+    {
+        static $FMT1 = 'NO services attached!! (%s and uri \'%s\'), return status 500';
         static $FMT2 = 'FastRoute addRoute error for %s and uri \'%s\', return status 500';
         static $FMT3 = 'Dispatcher FastRoute error for %s and uri \'%s\', return status 500';
-        $requestUri  = $request->getAttribute( self::REQUESTTARGET, '/' );
-        $httpMethod  = $request->getMethod();
-        $services    = $this->getServices();
-        if ( empty( $services ) ) {
+        $requestUri  = $this->request->getAttribute( self::REQUESTTARGET, '/' );
+        $httpMethod  = $this->request->getMethod();
+        $services    = $this->getArrayOfServiceDefinitions();
+        if ( empty( $services )) {
             throw new RuntimeException( \sprintf( $FMT1, $httpMethod, $requestUri ), 500 );
         }
         try {
@@ -709,87 +728,102 @@ class RestServer
         } catch ( Exception $e ) { // & FastRoute\BadRouteException etc
             throw new RuntimeException( \sprintf( $FMT3, $httpMethod, $requestUri ), 500, $e );
         }
-
         return $serviceInfo;
     }
 
     /**
-     * Exec callback for matched rest service (method, uri)
+     * Return array of rest services [*[method, uri, callback]]
      *
-     * @param ServerRequestInterface $request
-     * @param ResponseInterface      $response
-     * @param array                  $serviceInfo
+     * @return array
+     * @access private
+     */
+    private function getArrayOfServiceDefinitions()
+    {
+        $return = [];
+        foreach ( $this->services as $method => $uriServices ) {
+            foreach ( $uriServices as $uri => $definition ) {
+                if ( ! empty( $definition )) {
+                    $return[] = $definition;
+                }
+            }
+        }
+        return $return;
+    }
+
+    /**
+     * Exec callback for matched rest service method and uri
+     *
+     * @param array $serviceInfo
      * @return ResponseInterface
      * @access private
      * @link https://github.com/nikic/FastRoute
      */
-    private function execService(
-        ServerRequestInterface $request,
-        ResponseInterface $response,
+    private function execServiceDefinitionCallback(
         array $serviceInfo
     ) {
-        static $FMT3 = '%s and uri \'%s\' NOT found, return status 404';
-        static $FMT4 = '%s with \'%s\' NOT allowed, return status 405';
-        $httpMethod = $request->getMethod();
+        static $FMT4 = '%s %s with \'%s\' NOT allowed, return status 405';
+        static $FMT3 = '%s %s and uri \'%s\' NOT found, return status 404';
+        $httpMethod = $this->request->getMethod();
         switch ( $serviceInfo[0] ) {
-            case Dispatcher::NOT_FOUND :
-                $requestUri = $request->getAttribute( self::REQUESTTARGET, '/' );
-                self::log( \sprintf( $FMT3, $httpMethod, $requestUri ), self::WARNING );
-                self::log( $request, self::WARNING );
-                return $response->withStatus( 404 );
-                break;
-            case Dispatcher::METHOD_NOT_ALLOWED :
-                $requestUri = $request->getAttribute( self::REQUESTTARGET, '/' );
-                self::log( \sprintf( $FMT4, $httpMethod, $requestUri ), self::WARNING );
-                self::log( $request, self::WARNING );
-                $allowedMethods = RequestMethodHandler::extendAllowedMethods(
-                    $request,
-                    $serviceInfo[1]
-                );
-                return RequestMethodHandler::setStatusMethodNotAllowed(
-                    $response,
-                    $allowedMethods
-                );
-                break;
             case Dispatcher::FOUND :
                 if ( ! empty( $serviceInfo[2] )) {
-                    $request = self::updateRequest(
-                        $request,
+                    $this->request = self::updateRequest(
+                        $this->request,
                         $serviceInfo[2],
                         $httpMethod
                     );
                 }
                 $handler = $serviceInfo[1];
-                return $handler( $request, $response );
+                return $handler( $this->request, $this->response );
+                break;
+            case Dispatcher::METHOD_NOT_ALLOWED :
+                $corrId = $this->config[self::CORRELATIONID] . self::$space;
+                $requestUri = $this->request->getAttribute( self::REQUESTTARGET, self::$slash );
+                self::log( \sprintf( $FMT4, $corrId, $httpMethod, $requestUri ), self::WARNING );
+                self::log( $corrId . LogUtilHandler::getRequestToString( $this->request ), self::WARNING );
+                $allowedMethods = RequestMethodHandler::extendAllowedMethods(
+                    $this->request,
+                    $serviceInfo[1]
+                );
+                return RequestMethodHandler::setStatusMethodNotAllowed(
+                    $this->response,
+                    $allowedMethods
+                );
+                break;
+            case Dispatcher::NOT_FOUND :
+                // no break
+            default :
+                $corrId = $this->config[self::CORRELATIONID] . self::$space;
+                $requestUri = $this->request->getAttribute( self::REQUESTTARGET, self::$slash );
+                self::log( \sprintf( $FMT3, $corrId, $httpMethod, $requestUri ), self::WARNING );
+                self::log( $corrId . LogUtilHandler::getRequestToString( $this->request ), self::WARNING );
+                return $this->response->withStatus( 404 );
                 break;
         } // end switch
-        return $response;
     }
 
     /**
      * Return uri from requestTarget (with baseUri eliminated)
      *
-     * @param ServerRequestInterface $request
      * @return string
      * @access private
      */
-    private function getUriFromRequestTarget(
-        ServerRequestInterface $request
-    ) {
+    private function getUriFromRequestTarget()
+    {
         static $FILE = 'file';
         static $Q    = '?';
-        static $S    = '/';
-        $uri = $request->getRequestTarget();
-        if ( false !== ( $pos = \strpos( $uri, $Q ) ) ) {
+        $uri = $this->request->getRequestTarget();
+        if ( false !== ( $pos = \strpos( $uri, $Q )) ) {
             $uri = \substr( $uri, 0, $pos );
         }
-        $baseUri = ( isset( $this->config[self::BASEURI] ) )
+        $baseUri = ( isset( $this->config[self::BASEURI] ))
             ? $this->config[self::BASEURI]
-            : \basename( ( \array_slice( \debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS ), -1 ) )[0][$FILE] );
+            : \basename(( \array_slice( \debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS ), -1 ))[0][$FILE] );
         if ( ! empty( $baseUri ) &&
-            ( false !== \strpos( $uri, $baseUri ) ) ) {
-            $uriParts = \explode( $S, $uri );
-            $found = false;
+            ( false !== \strpos( $uri, $baseUri )) ) {
+            $uriParts = \explode( self::$slash, $uri );
+            $found    = false;
+            $x        = 0;
             foreach ( $uriParts as $x => $uriPart ) {
                 if ( $baseUri == $uriPart ) {
                     $found = true;
@@ -797,9 +831,9 @@ class RestServer
                 }
             } // end foreach
             if ( $found ) {
-                $uriParts = \array_slice( $uriParts, ( $x + 1 ) );
+                $uriParts = \array_slice( $uriParts, ( $x + 1 ));
             }
-            $uri = $S . \implode( $S, $uriParts );
+            $uri = self::$slash . \implode( self::$slash, $uriParts );
         }
         return $uri;
     }
@@ -813,7 +847,7 @@ class RestServer
      * @return ServerRequestInterface
      * @access private
      * @static
-     * @todo mgnt of parsedBody array error
+     * @todo management of parsedBody array error
      */
     private static function updateRequest(
         ServerRequestInterface $request,
@@ -827,7 +861,7 @@ class RestServer
         ];
         $queryParams = $request->getQueryParams();
         $parsedBody  = $request->getParsedBody();
-        $isQueryMethod = ( \in_array( $httpMethod, $queryMethods ) );
+        $isQueryMethod = ( \in_array( $httpMethod, $queryMethods ));
         if ( null === $parsedBody ) {
             $parsedBody = [];
         }
@@ -837,27 +871,8 @@ class RestServer
                 $queryParams[$k] = $v;
             }
         } // end foreach
-        return $request->withQueryParams( $queryParams )->withParsedBody( $parsedBody );
-    }
-
-    /**
-     * Return new stream, opt with data
-     *
-     * @param null|string $data
-     * @return Stream
-     * @throws RuntimeException on stream write error
-     * @static
-     */
-    public static function getNewStream(
-        $data = null
-    ) {
-        static $arg1 = 'php://memory';
-        static $arg2 = 'wb+';
-        $stream = new Stream( $arg1, $arg2 );
-        if ( null !== $data ) {
-            $stream->write( $data );
-        }
-        return $stream;
+        return $request->withQueryParams( $queryParams )
+                       ->withParsedBody( $parsedBody );
     }
 
     /** ***********************************************************************
@@ -879,11 +894,11 @@ class RestServer
     ) {
         return $response->withRawBody(
             [
-                'service' => [
+                'service' => array(
                     'server'    => get_class() . ' ' . self::$version,
                     'copyright' => '2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved',
                     'time'      => date('Y-m-d H:i:s' ),
-                ],
+                ),
             ]
         );
     }
@@ -896,13 +911,15 @@ class RestServer
      */
     public static function getPingServiceDef()
     {
+        $class = get_class();
         return [
             self::METHOD   => [
                 RequestMethodHandler::METHOD_GET,
             ],
             self::URI      => '/ping',
             self::CALLBACK => [
-                'self', 'pingService',
+                $class,
+                'pingService',
             ],
         ];
     }
@@ -915,11 +932,8 @@ class RestServer
      * Logger constants
      */
     const ERROR   = 'error';
-
     const WARNING = 'warning';
-
     const INFO    = 'info';
-
     const DEBUG   = 'debug';
 
     /**

@@ -27,62 +27,44 @@
  *           If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace Kigkonsult\RestServer\Handlers\EncodingHandlers;
+namespace Kigkonsult\RestServer\Handlers;
 
-use Kigkonsult\RestServer\Handlers\Exceptions\ZlibErrorException;
+use Psr\Http\Message\ServerRequestInterface;
+use Kigkonsult\RestServer\RestServer;
 
 /**
- * GzipHandler manages 'gzip' decode/encode operations
+ * Parent class for CorsHandler and AuthenticationHandler
  */
-class GzipHandler implements EncodingInterface
+abstract class AbstractCAHandler extends AbstractHandler implements HandlerInterface
 {
     /**
-     * Uncompress gzipped data
+     * Return config (if set), otherwise empty array
      *
-     * @param string $data
-     * @param int   $level
-     * @param int   $options
-     * @return string
+     * Updates default error status return codes
+     * @param ServerRequestInterface $request
+     * @param string                 $key
+     * @param array                  $defaults
+     * @return array
+     * @access protected
      * @static
-     * @throws ZlibErrorException
      */
-    public static function deCode(
-        $data,
-        $level = null,
-        $options = null
+    protected static function getConfig(
+        ServerRequestInterface $request,
+                               $key,
+                         array $defaults
     ) {
-        $uncompressed = @\gzdecode( $data );
-        if ( false !== $uncompressed ) {
-            return $uncompressed;
+        $config = $request->getAttribute( RestServer::CONFIG, [] );
+        if ( ! isset( $config[$key] )) {
+            return $defaults;
         }
-        throw new ZlibErrorException( __METHOD__, 500 );
-    }
 
-    /**
-     * Compress data as gzip
-     *
-     * @param mixed $data
-     * @param int   $level
-     * @param int   $options
-     * @return string
-     * @static
-     * @throws ZlibErrorException
-     */
-    public static function enCode(
-        $data,
-        $level = null,
-        $options = null
-    ) {
-        if ( empty( $level )) {
-            $level = -1;
+        $cfg = $config[$key];
+        foreach ( $defaults as $default => $value ) {
+            if ( ! isset( $cfg[$default] )) {
+                $cfg[$default] = $value;
+            }
         }
-        if ( empty( $options )) {
-            $options = FORCE_GZIP;
-        }
-        $compressed = @\gzencode( $data, $level, $options );
-        if ( false !== $compressed ) {
-            return $compressed;
-        }
-        throw new ZlibErrorException( __METHOD__, 500 );
+
+        return $cfg;
     }
 }

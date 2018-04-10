@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -30,22 +30,23 @@
 namespace Kigkonsult\RestServer\Handlers;
 
 use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use Kigkonsult\RestServer\ResponseInterface;
 use Kigkonsult\RestServer\RestServer;
 use RuntimeException;
 
 /**
  * corsHandler provides simple request support, general for ALL requests uri target
  *
+ * @see cfg/cfg.2.cors.php
  * @see https://www.html5rocks.com/en/tutorials/cors/
  * @see https://www.html5rocks.com/static/images/cors_server_flowchart.png
  */
-class CorsHandler extends AbstractHandler
+class CorsHandler extends AbstractCAHandler
 {
     /**
      * Request header
      */
-    const ORIGIN                        = 'Origin';                           // Request header
+    const ORIGIN                        = 'Origin';
 
     /**
      * config key
@@ -133,9 +134,10 @@ class CorsHandler extends AbstractHandler
     private static $COMMASP = ', ';
 
     /**
-     * Handler callback validating cors
+     * Handler validating cors
      *
      * @see https://www.html5rocks.com/static/images/cors_server_flowchart.png
+     *
      * Requires config, see cfg/cfg.2.cors.php
      *
      * @param ServerRequestInterface $request
@@ -152,37 +154,48 @@ class CorsHandler extends AbstractHandler
         static $ERRORFMT34 = 'Error in cors preflight request';
         static $TRUE       = 'true';
 
-        $corsCfg           = self::getConfig( $request, $corsExpected );
+        $corsCfg           = parent::getConfig( $request, self::CORS, self::$defaults );
+        $corsIgnore        = ( isset( $corsCfg[RestServer::IGNORE] ) && ( true === $corsCfg[RestServer::IGNORE] ));
+        $corsExpected      = ( isset( $corsCfg[RestServer::ALLOW] ));
         $hasOriginHeader   = $request->hasHeader( self::ORIGIN );
 
+        // Origin not expected and not found, ok
         if( ! $corsExpected && ! $hasOriginHeader ) {
-            return [ // Origin not expected and not found, ok
+            return [
                 $request,
                 $response,
             ];
-        }
-
+        } // end if
+        // Origin not expected but found and ignored, ok
+        if( $corsIgnore && $hasOriginHeader ) {
+            return [
+                $request,
+                $response,
+            ];
+        } // end if
+        // Origin expected but not found, error 1
         if( $corsExpected && ! $hasOriginHeader ) {
-            return self::doLogReturn( // Origin expected but not found, error 1
+            return self::doLogReturn(
                 $request->withAttribute( RestServer::ERROR, true ),
                 $response->withStatus( $corsCfg[self::ERRORCODE1] ),
                 new RuntimeException( $ERRORFMT1 ),
                 RestServer::WARNING
             );
-        }
+        } // end if
 
         $requestOriginHeaderValue = $request->getHeader( self::ORIGIN )[0];
+        // Origin not expected but found and not ignored, error 2a
         if( ! $corsExpected ) {
-            return self::doLogReturn( // Origin not expected but found, error 2a
+            return self::doLogReturn(
                 $request->withAttribute( RestServer::ERROR, true ),
-                $response->withStatus( self::$defaults[self::ERRORCODE2] ),
+                $response->withStatus( $corsCfg[self::ERRORCODE2] ),
                 new RuntimeException( sprintf( $ERRORFMT2a, $requestOriginHeaderValue )),
                 RestServer::WARNING
             );
         } // end if
-
+        // Origin found but not valid, error 2b
         if( ! self::checkOrigin( $corsCfg, $requestOriginHeaderValue )) {
-            return self::doLogReturn( // Origin found but not valid, error 2b
+            return self::doLogReturn(
                 $request->withAttribute( RestServer::ERROR, true ),
                 $response->withStatus( $corsCfg[self::ERRORCODE2] ),
                 new RuntimeException( sprintf( $ERRORFMT2b, $requestOriginHeaderValue )),
@@ -191,8 +204,7 @@ class CorsHandler extends AbstractHandler
         } // end if
 
         // preflight request
-        if (( 0 == \strcasecmp( RequestMethodHandler::METHOD_OPTIONS, $request->getMethod())) &&
-             $request->hasHeader( self::ACCESSCONTROLREQUESTMETHOD )) {
+        if( self::isPreflightRequest( $request )) {
             $errorCode = null;
             $response  = self::doPreflightRequest(
                 $request,
@@ -217,48 +229,23 @@ class CorsHandler extends AbstractHandler
             );
         } // end elseif
 
-        $response = $response->withHeader( self::ACCESSCONTROLALLOWORIGIN, $requestOriginHeaderValue );
+        $response = $response->withHeader(
+            self::ACCESSCONTROLALLOWORIGIN,
+            $requestOriginHeaderValue
+        );
 
         if ( isset( $corsCfg[self::ACCESSCONTROLALLOWCREDENTIALS] ) &&
             (bool) $corsCfg[self::ACCESSCONTROLALLOWCREDENTIALS] ) {
             // allow cookies
-            $response = $response->withHeader( self::ACCESSCONTROLALLOWCREDENTIALS, $TRUE );
+            $response = $response->withHeader(
+                self::ACCESSCONTROLALLOWCREDENTIALS,
+                $TRUE
+            );
         }
         return [
             $request,
             $response,
         ];
-    }
-
-    /**
-     * Return cors config (if set), otherwise no cors-validation
-     *
-     * Updates default error status return codes
-     * @param ServerRequestInterface $request
-     * @param bool                   $corsExpected
-     * @return array
-     * @access private
-     * @static
-     */
-    private static function getConfig(
-        ServerRequestInterface $request,
-                             & $corsExpected = false
-    ) {
-        $config = $request->getAttribute( RestServer::CONFIG, [] );
-        if ( ! isset( $config[self::CORS] )) {
-            $corsExpected = false;
-            return [];
-        }
-
-        $corsExpected  = true;
-        $corsCfg = $config[self::CORS];
-        foreach ( self::$defaults as $default => $value ) {
-            if ( ! isset( $corsCfg[$default] )) {
-                $corsCfg[$default] = $value;
-            }
-        }
-
-        return $corsCfg;
     }
 
     /**
@@ -274,7 +261,7 @@ class CorsHandler extends AbstractHandler
         array $corsCfg,
               $requestOriginHeaderValue
     ) {
-        $found         = false;
+        $found = false;
         foreach ( $corsCfg[RestServer::ALLOW] as $acceptedOrigin ) {
             if (( self::AST == $acceptedOrigin ) ||  // all accepted OR accepted found
                ( 0 == \strcasecmp( $acceptedOrigin, $requestOriginHeaderValue ))) {
@@ -283,6 +270,21 @@ class CorsHandler extends AbstractHandler
             }
         } // end foreach
         return $found;
+    }
+
+    /**
+     * Return bool true if it is a preflight request
+     *
+     * @param ServerRequestInterface $request
+     * @return bool
+     * @access private
+     * @static
+     */
+    private static function isPreflightRequest(
+        ServerRequestInterface $request
+    ) {
+        return (( 0 == \strcasecmp( RequestMethodHandler::METHOD_OPTIONS, $request->getMethod())) &&
+            $request->hasHeader( self::ACCESSCONTROLREQUESTMETHOD ));
     }
 
     /**
@@ -304,11 +306,7 @@ class CorsHandler extends AbstractHandler
         array                  $corsCfg,
                              & $errorCode = 0
     ) {
-        $allowedMethods = $request->getAttribute( RestServer::REQUESTMETHODURI, [] );
-        if ( ! empty( $allowedMethods )) {
-            $allowedMethods = \array_keys( $allowedMethods );
-        }
-        $allowedMethods = RequestMethodHandler::extendAllowedMethods( $request, $allowedMethods );
+        $allowedMethods = self::getAllowedMethods( $request );
         $found          = false;
         $requestMethod  = $request->getHeader( self::ACCESSCONTROLREQUESTMETHOD )[0];
         foreach ( $allowedMethods as $allowMethod ) {
@@ -331,7 +329,8 @@ class CorsHandler extends AbstractHandler
                         ? (array) $corsCfg[self::ACCESSCONTROLALLOWHEADERS]
                         : [];
         if ( $request->hasHeader( self::ACCESSCONTROLREQUESTHEADERS )) {
-            $requestHeaderValues = \explode( self::COMMA, $request->getHeader( self::ACCESSCONTROLREQUESTHEADERS )[0] );
+            $headerValue = $request->getHeader( self::ACCESSCONTROLREQUESTHEADERS )[0];
+            $requestHeaderValues = \explode( self::COMMA, $headerValue );
             foreach ( $requestHeaderValues as $requestHeaderValue ) {
                 $found = false;
                 foreach ( $allowHeaders as $allowHeader ) {
@@ -360,5 +359,22 @@ class CorsHandler extends AbstractHandler
             );
         }
         return $response;
+    }
+    /**
+     * Return (array) allowed methods
+     *
+     * @param ServerRequestInterface $request
+     * @return array
+     * @access private
+     * @static
+     */
+    private static function getAllowedMethods(
+        ServerRequestInterface $request
+    ) {
+        $allowedMethods = $request->getAttribute( RestServer::REQUESTMETHODURI, [] );
+        if ( ! empty( $allowedMethods )) {
+            $allowedMethods = \array_keys( $allowedMethods );
+        }
+        return RequestMethodHandler::extendAllowedMethods( $request, $allowedMethods );
     }
 }

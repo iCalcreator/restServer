@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -39,6 +39,7 @@ use PHPUnit\Framework\TestCase;          // PHPUnit > 6.1.0
 use Zend\Diactoros\ServerRequest;
 use Kigkonsult\RestServer\Response;
 use Kigkonsult\RestServer\RestServer;
+use Kigkonsult\RestServer\StreamFactory;
 use Kigkonsult\RestServer\Handlers\ContentTypeHandlers\XMLHandler;
 
 class ContentTypeHandlerTest extends TestCase
@@ -290,7 +291,7 @@ class ContentTypeHandlerTest extends TestCase
         $request     = $request->withMethod( 'POST' )
                                ->withAttribute( ContentTypeHandler::CONTENTTYPE, $contentType )
                                ->withAttribute( ContentTypeHandler::ACCEPT, $contentType )
-                               ->withBody( RestServer::getNewStream( $json ));
+                               ->withBody( StreamFactory::createStream( $json ));
         $this->assertEquals( $contentType, $request->getAttribute( ContentTypeHandler::CONTENTTYPE, false ));
         $this->assertEquals( $contentType, $request->getAttribute( ContentTypeHandler::ACCEPT, false ));
         $response                   = new Response();
@@ -305,7 +306,7 @@ class ContentTypeHandlerTest extends TestCase
         $data3 = $stream->getContents();
         $this->assertEquals( $json, $data3 );
         $this->assertEquals( $contentType, $response->getHeader( ContentTypeHandler::CONTENTTYPE )[0] );
-        $this->assertTrue( $response->hasHeader( ContentTypeHandler::CONTENTLENGTH ) );
+        $this->assertTrue( $response->hasHeader( ContentTypeHandler::CONTENTLENGTH ));
     }
 
     /**
@@ -371,7 +372,7 @@ class ContentTypeHandlerTest extends TestCase
         $request     = $request->withMethod( 'POST' )
                                ->withAttribute( ContentTypeHandler::CONTENTTYPE, $contentType )
                                ->withAttribute( ContentTypeHandler::ACCEPT, $contentType )
-                               ->withBody( RestServer::getNewStream( $xml ));
+                               ->withBody( StreamFactory::createStream( $xml ));
         $this->assertEquals( $contentType, $request->getAttribute( ContentTypeHandler::CONTENTTYPE, false ));
         $this->assertEquals( $contentType, $request->getAttribute( ContentTypeHandler::ACCEPT, false ));
         $response                   = new Response();
@@ -390,7 +391,7 @@ class ContentTypeHandlerTest extends TestCase
 //      $this->assertEquals( $xml, $data3 );
         $this->assertXmlStringEqualsXmlString( $xml, $data3 );
         $this->assertEquals( $contentType, $response->getHeader( ContentTypeHandler::CONTENTTYPE )[0] );
-        $this->assertTrue( $response->hasHeader( ContentTypeHandler::CONTENTLENGTH ) );
+        $this->assertTrue( $response->hasHeader( ContentTypeHandler::CONTENTLENGTH ));
     }
 
     /**
@@ -407,7 +408,7 @@ class ContentTypeHandlerTest extends TestCase
         $request     = $request->withMethod( 'POST' )
                                ->withAttribute( ContentTypeHandler::CONTENTTYPE, $contentType )
                                ->withAttribute( ContentTypeHandler::ACCEPT, $contentType )
-                               ->withBody( RestServer::getNewStream( $xml ));
+                               ->withBody( StreamFactory::createStream( $xml ));
         $this->assertEquals( $contentType, $request->getAttribute( ContentTypeHandler::CONTENTTYPE, false ));
         $this->assertEquals( $contentType, $request->getAttribute( ContentTypeHandler::ACCEPT, false ));
         $response = new Response();

@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -39,6 +39,7 @@ use PHPUnit\Framework\TestCase;          // PHPUnit > 6.1.0
 use Zend\Diactoros\ServerRequest;
 use Kigkonsult\RestServer\Response;
 use Kigkonsult\RestServer\RestServer;
+use Kigkonsult\RestServer\StreamFactory;
 use Kigkonsult\RestServer\Handlers\ContentTypeHandlers\JsonHandler;
 use Kigkonsult\RestServer\Handlers\ContentTypeHandlers\XMLHandler;
 use Kigkonsult\RestServer\Handlers\EncodingHandlers\DeflateHandler;
@@ -196,7 +197,7 @@ class EncodingHandlerTest extends TestCase
         ];
         $dataArr[] = [
             [
-                1 => 19, 'test' => 'json'
+                1 => 19, 'test' => 'json',
             ],
         ];
 
@@ -222,7 +223,7 @@ class EncodingHandlerTest extends TestCase
                                ->withAttribute( ContentTypeHandler::CONTENTTYPE, $contentType )
                                ->withAttribute( ContentTypeHandler::ACCEPT, $contentType )
                                ->withAttribute( EncodingHandler::ACCEPTENCODING, $encoding )
-                               ->withBody( RestServer::getNewStream( $compressed ));
+                               ->withBody( StreamFactory::createStream( $compressed ));
         $this->assertEquals( $encoding, $request->getAttribute( EncodingHandler::CONTENTENCODING, false ));
         $this->assertEquals( $contentType, $request->getAttribute( ContentTypeHandler::CONTENTTYPE, false ));
         $this->assertEquals( $contentType, $request->getAttribute( ContentTypeHandler::ACCEPT, false ));
@@ -246,7 +247,7 @@ class EncodingHandlerTest extends TestCase
         $this->assertEquals( @\gzdecode( $compressed ), @\gzdecode( $data3 ));
         $this->assertEquals( $contentType, $response->getHeader( ContentTypeHandler::CONTENTTYPE )[0] );
         $this->assertEquals( $encoding, $response->getHeader( EncodingHandler::CONTENTENCODING )[0] );
-        $this->assertTrue( $response->hasHeader( ContentTypeHandler::CONTENTLENGTH ) );
+        $this->assertTrue( $response->hasHeader( ContentTypeHandler::CONTENTLENGTH ));
     }
 
     /**
@@ -320,7 +321,7 @@ class EncodingHandlerTest extends TestCase
                                ->withAttribute( ContentTypeHandler::CONTENTTYPE, $contentType )
                                ->withAttribute( ContentTypeHandler::ACCEPT, $contentType )
                                ->withAttribute( EncodingHandler::ACCEPTENCODING, $encoding )
-                               ->withBody( RestServer::getNewStream( $compressed ));
+                               ->withBody( StreamFactory::createStream( $compressed ));
         $this->assertEquals( $encoding, $request->getAttribute( EncodingHandler::CONTENTENCODING, false ));
         $this->assertEquals( $contentType, $request->getAttribute( ContentTypeHandler::CONTENTTYPE, false ));
         $this->assertEquals( $contentType, $request->getAttribute( ContentTypeHandler::ACCEPT, false ));
@@ -340,9 +341,9 @@ class EncodingHandlerTest extends TestCase
         $stream = $response->getBody();
         $stream->rewind();
         $data3 = $stream->getContents();
-        $this->assertXmlStringEqualsXmlString( @\gzuncompress( $compressed ), @\gzuncompress( $data3 ) );
+        $this->assertXmlStringEqualsXmlString( @\gzuncompress( $compressed ), @\gzuncompress( $data3 ));
         $this->assertEquals( $contentType, $response->getHeader( ContentTypeHandler::CONTENTTYPE )[0] );
         $this->assertEquals( $encoding, $response->getHeader( EncodingHandler::CONTENTENCODING )[0] );
-        $this->assertTrue( $response->hasHeader( ContentTypeHandler::CONTENTLENGTH ) );
+        $this->assertTrue( $response->hasHeader( ContentTypeHandler::CONTENTLENGTH ));
     }
 }

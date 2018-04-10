@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -31,8 +31,9 @@ namespace Kigkonsult\RestServer\Handlers;
 
 use Fig\Http\Message\RequestMethodInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use Kigkonsult\RestServer\ResponseInterface;
 use Kigkonsult\RestServer\RestServer;
+use Kigkonsult\RestServer\StreamFactory;
 use RuntimeException;
 
 /**
@@ -127,7 +128,7 @@ class RequestMethodHandler extends AbstractHandler implements RequestMethodInter
     public static function isValidRequestMethod(
         $method
     ) {
-        foreach ( (array) $method as $mthd ) {
+        foreach ((array) $method as $mthd ) {
             if ( ! \in_array( $mthd, self::$requestMethods )) {
                 return false;
             }
@@ -149,27 +150,25 @@ class RequestMethodHandler extends AbstractHandler implements RequestMethodInter
         static $ERRORFMT2                           = 'No support for %s: %s';
         $method                                     = $request->getMethod();
         list( $allowedMethods, $disallowedMethods ) = self::getAccurateMethods( $request );
-        if ( ! self::isValidRequestMethod( $method ) ||
-              \in_array( $method, $disallowedMethods ) ||
-            ! \in_array( $method, $allowedMethods )) {
-            return self::doLogReturn(
-                $request->withAttribute( RestServer::ERROR, true ),
-                self::setStatusMethodNotAllowed(
-                     $response,
-                     $allowedMethods
-                ),
-                new RuntimeException( \sprintf(
-                    $ERRORFMT2,
-                    self::REQUESTMETHOD,
-                    $method
-                )),
-                RestServer::WARNING
-            );
-        } // end if
-        return [
-            $request,
-            $response,
-        ];
+        if( self::isMethodAccepted( $method, $disallowedMethods, $allowedMethods )) {
+            return [
+                $request,
+                $response,
+            ];
+        }
+        return self::doLogReturn(
+            $request->withAttribute( RestServer::ERROR, true ),
+            self::setStatusMethodNotAllowed(
+                 $response,
+                 $allowedMethods
+            ),
+            new RuntimeException( \sprintf(
+                $ERRORFMT2,
+                self::REQUESTMETHOD,
+                $method
+            )),
+            RestServer::WARNING
+        );
     }
 
     /**
@@ -191,8 +190,29 @@ class RequestMethodHandler extends AbstractHandler implements RequestMethodInter
             $allowedMethods,
             $disallowedMethods
         );
-
         return [$allowedMethods, $disallowedMethods];
+    }
+
+    /**
+     * Return bool true if method is accepted
+     *
+     * @param string $method
+     * @param array $disallowedMethods
+     * @param array $allowedMethods
+     * @return bool
+     * @access private
+     * @static
+     */
+    private static function isMethodAccepted(
+        $method,
+        array $disallowedMethods,
+        array $allowedMethods
+    ) {
+        return (
+            self::isValidRequestMethod( $method ) &&
+            ! \in_array( $method, $disallowedMethods ) &&
+            \in_array( $method, $allowedMethods )
+        );
     }
 
     /**
@@ -207,7 +227,6 @@ class RequestMethodHandler extends AbstractHandler implements RequestMethodInter
         ServerRequestInterface $request
     ) {
         $config = $request->getAttribute( RestServer::CONFIG, [] );
-
         return ( isset( $config[RestServer::DISALLOW] )) ? $config[RestServer::DISALLOW] : [];
     }
 
@@ -271,7 +290,7 @@ class RequestMethodHandler extends AbstractHandler implements RequestMethodInter
     ) {
         return $response->withHeader(
             RestServer::ALLOW,
-            \implode( self::COMMA . ' ', $allowedMethods )
+            \implode( self::COMMA . self::$SP, $allowedMethods )
         );
     }
 
@@ -308,7 +327,7 @@ class RequestMethodHandler extends AbstractHandler implements RequestMethodInter
         if ( JSON_ERROR_NONE !== \json_last_error()) {
             throw new RuntimeException( \json_last_error_msg(), 500 );
         }
-        $response = $response->withBody( RestServer::getNewStream( $jsonString ));
+        $response = $response->withBody( StreamFactory::createStream( $jsonString ));
         return ContentTypeHandler::setContentLength( $request, $response, true );
     }
 }

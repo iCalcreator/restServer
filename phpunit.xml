@@ -6,7 +6,7 @@ This file is a part of restServer.
 
 Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
 Link      http://kigkonsult.se/restServer/index.php
-Version   0.8.0
+Version   0.9.23
 License   Subject matter of licence is the software restServer.
           The above copyright, link, package and version notices and
           this licence notice shall be included in all copies or
@@ -76,8 +76,10 @@ License   Subject matter of licence is the software restServer.
             <file>./src/Response.php</file>
             <file>./src/RestServer.php</file>
             <file>./src/ServerRequestFactory.php</file>
+            <file>./src/StreamFactory.php</file>
             <file>./src/Handlers/AbstractHandler.php</file>
             <file>./src/Handlers/RequestMethodHandler.php</file>
+            <file>./src/Handlers/AbstractCAHandler.php</file>
             <file>./src/Handlers/CorsHandler.php</file>
             <file>./src/Handlers/AbstractCteHandler.php</file>
             <file>./src/Handlers/ContentTypeHandler.php</file>

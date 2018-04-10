@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -30,7 +30,7 @@
 namespace Kigkonsult\RestServer\Handlers;
 
 use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Message\ResponseInterface;
+use Kigkonsult\RestServer\ResponseInterface;
 use Kigkonsult\RestServer\RestServer;
 use Exception;
 
@@ -40,8 +40,12 @@ use Exception;
 class LogUtilHandler implements HandlerInterface
 {
     /**
-     * Class constants, headers, cfg keys etc
+     * @var string ' '
+     * @access protected
+     * @static
+     * @access private
      */
+    private static $SP = ' ';
 
     /**
      * Return stringified object
@@ -89,7 +93,6 @@ class LogUtilHandler implements HandlerInterface
         static $FMT2 = 'headers: %s';
         static $FMT3 = 'attributes: %s';
         static $FMT4 = 'queryParams: %s';
-
         $string      = [];
         $requestUri  = $request->getAttribute( RestServer::REQUESTTARGET, $request->getRequestTarget());
         $string[]    = \sprintf( $FMT1, $request->getMethod(), $requestUri );
@@ -123,45 +126,35 @@ class LogUtilHandler implements HandlerInterface
     /**
      * Handler callback debug logging request method, target, headers and attributes, testing
      *
-     * Requires global $RestServerLogger
      * @param ServerRequestInterface $request
-     * @param ResponseInterface      $response
-     * @return array [ ServerRequestInterface, ResponseInterface ]
      */
     public static function logRequest(
-        ServerRequestInterface $request,
-        ResponseInterface      $response
+        ServerRequestInterface $request
     ) {
         $logger = RestServer::getLogger();
+        $config  = $request->getAttribute( RestServer::CONFIG, [] );
+        $corrId  = ( isset( $config[RestServer::CORRELATIONID] )) ? $config[RestServer::CORRELATIONID] . self::$SP : null;
         if ( ! empty( $logger ) && \method_exists( $logger, RestServer::DEBUG )) {
-            $logger->{RestServer::DEBUG}( self::getRequestToString( $request ));
+            $logger->{RestServer::DEBUG}( $corrId . self::getRequestToString( $request ));
         }
-        return [
-            $request,
-            $response,
-        ];
     }
 
     /**
      * Handler callback debug logging response status and headers, testing
      *
-     * Requires global $RestServerLogger
      * @param ServerRequestInterface $request
-     * @param ResponseInterface      $response
-     * @return array [ ServerRequestInterface, ResponseInterface ]
+     * @param ResponseInterface $response
      */
     public static function logResponse(
         ServerRequestInterface $request,
-        ResponseInterface      $response
+             ResponseInterface $response
     ) {
         $logger = RestServer::getLogger();
+        $config  = $request->getAttribute( RestServer::CONFIG, [] );
+        $corrId  = ( isset( $config[RestServer::CORRELATIONID] )) ? $config[RestServer::CORRELATIONID] . self::$SP : null;
         if ( ! empty( $logger ) && \method_exists( $logger, RestServer::DEBUG )) {
-            $logger->{RestServer::DEBUG}( self::getResponseToString( $response ));
+            $logger->{RestServer::DEBUG}( $corrId . self::getResponseToString( $response ));
         }
-        return [
-            $request,
-            $response,
-        ];
     }
 
     /**
@@ -196,12 +189,12 @@ class LogUtilHandler implements HandlerInterface
             }
             $result[] = \sprintf(
                 ' at %s%s%s(%s%s%s)',
-                                 \count( $trace ) && \array_key_exists( 'class', $trace[0] ) ? \str_replace( '\\', '.', $trace[0]['class'] ) : '',
-                                 \count( $trace ) && \array_key_exists(' class', $trace[0] ) && \array_key_exists( 'function', $trace[0] ) ? '.' : '',
-                                 \count( $trace ) && \array_key_exists(' function', $trace[0] ) ? \str_replace( '\\', '.', $trace[0]['function'] ) : '(main)',
-                                 $line === null ? $file : \basename( $file ),
-                                 $line === null ? '' : ':',
-                                 $line === null ? '' : $line
+                \count( $trace ) && \array_key_exists( 'class', $trace[0] ) ? \str_replace( '\\', '.', $trace[0]['class'] ) : '',
+                  \count( $trace ) && \array_key_exists(' class', $trace[0] ) && \array_key_exists( 'function', $trace[0] ) ? '.' : '',
+                     \count( $trace ) && \array_key_exists(' function', $trace[0] ) ? \str_replace( '\\', '.', $trace[0]['function'] ) : '(main)',
+                     $line === null ? $file : \basename( $file ),
+                     $line === null ? '' : ':',
+                     $line === null ? '' : $line
             );
             if ( \is_array( $seen )) {
                 $seen[] = "$file:$line";

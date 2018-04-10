@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -50,13 +50,13 @@ class RequestMethodHandlerTest extends TestCase
         $dataArr   = [];
         $dataArr[] = [
             [
-                RequestMethodHandler::REQUESTMETHOD => RequestMethodHandler::METHOD_GET
+                RequestMethodHandler::REQUESTMETHOD => RequestMethodHandler::METHOD_GET,
             ],
             RequestMethodHandler::METHOD_GET,
         ];
         $dataArr[] = [
             [
-                RequestMethodHandler::REQUESTMETHOD => RequestMethodHandler::METHOD_POST
+                RequestMethodHandler::REQUESTMETHOD => RequestMethodHandler::METHOD_POST,
             ],
             RequestMethodHandler::METHOD_POST,
         ];

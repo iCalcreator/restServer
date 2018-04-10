@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.4
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -32,6 +32,8 @@ namespace Kigkonsult\RestServer;
 use PHPUnit\Framework\TestCase;          // PHPUnit > 6.1.0
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
+use Kigkonsult\RestServer\Handlers\ContentTypeHandler;
+use Kigkonsult\RestServer\Handlers\EncodingHandler;
 
 /**
  * key constants
@@ -59,9 +61,7 @@ class HandlerClass
         ServerRequestInterface $request,
         ResponseInterface $response
     ) {
-        if ( empty( $this->value1 ) ) {
-            $this->value1 = \serialize( $request->getParsedBody() );
-        }
+        $this->value1 = \serialize( $request->getParsedBody());
 
         $cnt     = $request->getAttribute( HANDLERCNT, 0 );
         $request = $request->withAttribute( HANDLERCNT, ( $cnt + 1 ));
@@ -277,6 +277,25 @@ class ServiceClass7
 
 }
 
+/**
+ * Final handler, may be like any callable above
+ */
+class FinalHandlerClass
+{
+    /**
+     * Final handler method
+     *
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface      $response
+     * @return bool
+     */
+    public function finalHandlerMethod(
+        ServerRequestInterface $request,
+        ResponseInterface      $response
+    ) {
+        return true;
+    }
+}
 class RestServerTest extends TestCase
 {
     /**
@@ -285,7 +304,8 @@ class RestServerTest extends TestCase
     public function RestServer0Provider()
     {
         $dataArr = [];
-        $HandlerClass = new HandlerClass();
+        $HandlerClass      = new HandlerClass();
+        $FinalHandlerClass = new FinalHandlerClass();
         $dataTemplate = [
             [  // config
                RestServer::DEBUG    => true,
@@ -296,6 +316,10 @@ class RestServerTest extends TestCase
                       'templateHandler1',
                    ],
                ],
+               RestServer::FINALHANDLER => [
+                   $FinalHandlerClass,
+                   'finalHandlerMethod'
+               ]
             ],
             [  // server
                'REQUEST_URI'          => 'http://anyHost.com/index.php/user',
@@ -305,10 +329,10 @@ class RestServerTest extends TestCase
                'HTTP_ACCEPT_ENCODING' => 'identity',
             ],
             null,       // query
-            null,       // body
+            null,       // body - 3
             null,       // cookies
             null,       // files
-            null,       // expected
+            null,       // expected - 6
         ];
 
         $dataArr[0] = $dataTemplate; // --------------- test data set #1
@@ -331,9 +355,9 @@ class RestServerTest extends TestCase
         $dataArr[0][3] = $data;
         $dataArr[0][6] = \serialize( $data );
 
-        $dataArr[0] = $dataTemplate; // --------------- test data set #2
+        $dataArr[1] = $dataTemplate; // --------------- test data set #2
         // anonymous function
-        $dataArr[0][0][RestServer::SERVICES][] = [
+        $dataArr[1][0][RestServer::SERVICES][] = [
             RestServer::METHOD   => 'GET',
             RestServer::URI      => '/user',
             RestServer::CALLBACK => $GLOBALS['callback2'],
@@ -341,13 +365,13 @@ class RestServerTest extends TestCase
         $data = [
             'param2' => 'test2'
         ];
-        $dataArr[0][3] = $data;
-        $dataArr[0][6] = \serialize( $data );
+        $dataArr[1][3] = $data;
+        $dataArr[1][6] = \serialize( $data );
 
-        $dataArr[0] = $dataTemplate; // --------------- test data set #3
+        $dataArr[2] = $dataTemplate; // --------------- test data set #3
         // instantiated object+method, passed as an array: object, method name
         $ServiceClass3 = new ServiceClass3();
-        $dataArr[0][0][RestServer::SERVICES][] = [
+        $dataArr[2][0][RestServer::SERVICES][] = [
             RestServer::METHOD   => 'GET',
             RestServer::URI      => '/user',
             RestServer::CALLBACK => [
@@ -358,13 +382,12 @@ class RestServerTest extends TestCase
         $data = [
             'param3' => 'test3'
         ];
-        $dataArr[0][3] = $data;
-        $dataArr[0][6] = \serialize( $data );
+        $dataArr[2][3] = $data;
+        $dataArr[2][6] = \serialize( $data );
 
-
-        $dataArr[0] = $dataTemplate; // --------------- test data set #4
+        $dataArr[3] = $dataTemplate; // --------------- test data set #4
         // class name and static method, passed as an array: class, method name (factory method?)
-        $dataArr[0][0][RestServer::SERVICES][] = [
+        $dataArr[3][0][RestServer::SERVICES][] = [
             RestServer::METHOD   => 'GET',
             RestServer::URI      => '/user',
             RestServer::CALLBACK => [
@@ -375,13 +398,13 @@ class RestServerTest extends TestCase
         $data = [
             'param4' => 'test4'
         ];
-        $dataArr[0][3] = $data;
-        $dataArr[0][6] = \serialize( $data );
+        $dataArr[3][3] = $data;
+        $dataArr[3][6] = \serialize( $data );
 
-        $dataArr[0] = $dataTemplate; // --------------- test data set #5
+        $dataArr[4] = $dataTemplate; // --------------- test data set #5
         // service as instantiated object, class has an (magic) __call method
         $ServiceClass5 = new ServiceClass5();
-        $dataArr[0][0][RestServer::SERVICES][] = [
+        $dataArr[4][0][RestServer::SERVICES][] = [
             RestServer::METHOD   => 'GET',
             RestServer::URI      => '/user',
             RestServer::CALLBACK => [
@@ -392,12 +415,12 @@ class RestServerTest extends TestCase
         $data = [
             'param5' => 'test5'
         ];
-        $dataArr[0][3] = $data;
-        $dataArr[0][6] = \serialize( $data );
+        $dataArr[4][3] = $data;
+        $dataArr[4][6] = \serialize( $data );
 
-        $dataArr[0] = $dataTemplate; // --------------- test data set #6
+        $dataArr[5] = $dataTemplate; // --------------- test data set #6
         // service as class name, class has an (magic) __callStatic method
-        $dataArr[0][0][RestServer::SERVICES][] = [
+        $dataArr[5][0][RestServer::SERVICES][] = [
             RestServer::METHOD   => 'GET',
             RestServer::URI      => '/user',
             RestServer::CALLBACK => [
@@ -408,13 +431,14 @@ class RestServerTest extends TestCase
         $data = [
             'param6' => 'test6'
         ];
-        $dataArr[0][3] = $data;
-        $dataArr[0][6] = \serialize( $data );
+        $dataArr[5][3] = $data;
+        $dataArr[5][6] = \serialize( $data );
 
-        $dataArr[0] = $dataTemplate; // --------------- test data set #7
+        $dataArr[6] = $dataTemplate; // --------------- test data set #7
+        $HandlerClass->value1 = null;
         // service as instantiated object, class has an (magic) __invoke method
         $ServiceClass7 = new ServiceClass7();
-        $dataArr[0][0][RestServer::SERVICES][] = [
+        $dataArr[6][0][RestServer::SERVICES][] = [
             RestServer::METHOD   => 'GET',
             RestServer::URI      => '/user',
             RestServer::CALLBACK => $ServiceClass7,
@@ -422,14 +446,14 @@ class RestServerTest extends TestCase
         $data = [
             'param7' => 'test7'
         ];
-        $dataArr[0][3] = $data;
-        $dataArr[0][6] = \serialize( $data );
+        $dataArr[6][3] = $data;
+        $dataArr[6][6] = \serialize( $data );
 
         return $dataArr;
     }
 
     /**
-     * test RestServer0 - method && route found, testing all possible callbacks from config
+     * test RestServer0 - method && route found, testing all possible callbacks from config + finalHandler
      *
      * @test
      * @dataProvider RestServer0Provider
@@ -444,13 +468,13 @@ class RestServerTest extends TestCase
         $expected       = null
     ) {
         $RestServer = new RestServer( $config, $server, $query, $body, $cookies, $files );
-        if ( LOG ) {
+        if ( defined( 'LOG' ) && LOG ){
             $RestServer->setLogger( new RestServerLogger());
         }
-        $response = $RestServer->serverCallback(
-            $RestServer->server->request,
-            $RestServer->server->response
-        );
+        if( isset( $config[RestServer::FINALHANDLER] ))
+            $RestServer->addFinalHandler( $config[RestServer::FINALHANDLER] );
+
+        $response = $RestServer->processRequest();
 
         $this->assertEquals( 200, $response->getStatusCode());
         $body2 = $response->getBody();
@@ -649,17 +673,14 @@ class RestServerTest extends TestCase
                       $expected = null
     ) {
         $RestServer = new RestServer( $config, $server, $query, $body, $cookies, $files );
-        if ( LOG ) {
+        if ( defined( 'LOG' ) && LOG ) {
             $RestServer->setLogger( new RestServerLogger());
         }
 
         list( $method, $uri, $callback ) = \array_values( $config[RestServer::SERVICES][1] );
         $this->assertTrue( $RestServer->detachRestService( $method, $uri ));
 
-        $response = $RestServer->serverCallback(
-            $RestServer->server->request,
-            $RestServer->server->response
-        );
+        $response = $RestServer->processRequest();
 
         $this->assertEquals( 200, $response->getStatusCode());
         $body2 = $response->getBody();
@@ -722,7 +743,7 @@ class RestServerTest extends TestCase
                     RestServer::METHOD   => 'GET',
                     RestServer::URI      => '/user/{id:\w+}/dummy',
                     RestServer::CALLBACK => [
-                        $ServiceClass3, 
+                        $ServiceClass3,
                         'templateService3'
                     ],
                 ],
@@ -772,7 +793,7 @@ class RestServerTest extends TestCase
                     RestServer::METHOD   => 'GET',
                     RestServer::URI      => '/user[/{id:\w+}]',
                     RestServer::CALLBACK => [
-                        $ServiceClass3, 
+                        $ServiceClass3,
                         'templateService3',
                     ],
                 ],
@@ -869,7 +890,7 @@ class RestServerTest extends TestCase
     ) {
         $RestServer = new RestServer( null, $server, $query, $body, $cookies, $files );
         $RestServer->setConfig( $config );
-        if ( LOG ) {
+        if ( defined( 'LOG' ) && LOG ) {
             $RestServer->setLogger( new RestServerLogger());
         }
 
@@ -885,10 +906,7 @@ class RestServerTest extends TestCase
         list( $method, $uri, $callback ) = \array_values( $services[1] );
         $RestServer->detachRestService( $method, $uri );
 
-        $response = $RestServer->serverCallback(
-            $RestServer->server->request,
-            $RestServer->server->response
-        );
+        $response = $RestServer->processRequest();
 
         $this->assertEquals( 200, $response->getStatusCode());
         $body2 = $response->getBody();
@@ -967,14 +985,11 @@ class RestServerTest extends TestCase
     ) {
         $RestServer = new RestServer( null, $server, $query, $body, $cookies, $files );
         $RestServer->setConfig( $config );
-        if ( LOG ) {
+        if ( defined( 'LOG' ) && LOG ) {
             $RestServer->setLogger( new RestServerLogger());
         }
 
-        $response = $RestServer->serverCallback(
-            $RestServer->server->request,
-            $RestServer->server->response
-        );
+        $response = $RestServer->processRequest();
 
         $this->assertEquals( 404, $response->getStatusCode());
         $RestServer->__destruct();
@@ -1053,15 +1068,12 @@ class RestServerTest extends TestCase
     ) {
         $RestServer = new RestServer( null, $server, $query, $body, $cookies, $files );
         $RestServer->setConfig( $config );
-        if ( LOG ) {
+        if ( defined( 'LOG' ) && LOG ) {
             $RestServer->setLogger( new RestServerLogger());
         }
         $RestServer->addHandler( $handler );
 
-        $response = $RestServer->serverCallback(
-            $RestServer->server->request,
-            $RestServer->server->response
-        );
+        $response = $RestServer->processRequest();
 
         $this->assertEquals( 405, $response->getStatusCode());
         $RestServer->__destruct();
@@ -1146,17 +1158,14 @@ class RestServerTest extends TestCase
     ) {
         $RestServer = new RestServer( null, $server, $query, $body, $cookies, $files );
         $RestServer->setConfig( $config );
-        if ( LOG ) {
+        if ( defined( 'LOG' ) && LOG ) {
             $RestServer->setLogger( new RestServerLogger());
         }
 
         $ServiceClass3->registerAsRestService( $RestServer->getAttachRestServiceCallback());
         $this->assertTrue( $RestServer->detachRestService( ServiceClass3::METHOD, ServiceClass3::ROUTE ));
 
-        $response = $RestServer->serverCallback(
-            $RestServer->server->request,
-            $RestServer->server->response
-        );
+        $response = $RestServer->processRequest();
 
         $this->assertEquals( 200, $response->getStatusCode());
 
@@ -1176,6 +1185,114 @@ class RestServerTest extends TestCase
             $this->assertTrue( \in_array( $method, $expected ));
         }
         $this->assertSame( $body3['GET'], $body3['HEAD'] );
+        $RestServer->__destruct();
+    }
+
+    /**
+     * testRestServer5 provider
+     */
+    public function RestServer5Provider()
+    {
+        $data          = [
+            'param5' => 'test5',
+        ];
+        $dataArr       = [];
+
+        $dataArr[]     = [ // test set #1
+            [  // config
+                RestServer::DEBUG    => true,
+                RestServer::BASEURI  => 'index.php',
+                RestServer::SERVICES =>[
+                    [
+                        RestServer::METHOD   => 'GET',
+                        RestServer::URI      => '/user',
+                        RestServer::CALLBACK => function (
+                            ServerRequestInterface $request,
+                            ResponseInterface      $response
+                        ) {
+                            $msg = $request->getParsedBody();
+
+                            return $response->withRawBody( $msg );
+                        },
+                    ],
+                ],
+            ],
+            [  // server
+                'REQUEST_URI'          => 'http://anyHost.com/index.php/user',
+                'SERVER_NAME'          => 'anyHost.com',
+                'REQUEST_METHOD'       => 'GET',
+            ],
+            null,       // query
+            $data,      // (array) body
+            null,       // cookies
+            null,       // files
+            $data,      // expected
+        ];
+        $dataArr[]     = [ // test set #2
+            [  // config
+                RestServer::DEBUG    => true,
+                RestServer::BASEURI  => 'index.php',
+                EncodingHandler::ACCEPTENCODING => [EncodingHandler::FALLBACK    => 'gzip'],
+                ContentTypeHandler::ACCEPT      => [ContentTypeHandler::FALLBACK => 'application/json'],
+                RestServer::SERVICES => [
+                    [
+                        RestServer::METHOD   => 'GET',
+                        RestServer::URI      => '/user',
+                        RestServer::CALLBACK => function (
+                            ServerRequestInterface $request,
+                            ResponseInterface      $response
+                        ) {
+                            $msg = $request->getParsedBody();
+
+                            return $response->withRawBody( $msg );
+                        },
+                    ],
+                ],
+            ],
+            [  // server
+                'REQUEST_URI'          => 'http://anyHost.com/index.php/user',
+                'SERVER_NAME'          => 'anyHost.com',
+                'REQUEST_METHOD'       => 'GET',
+            ],
+            null,       // query
+            $data,      // (array) body
+            null,       // cookies
+            null,       // files
+            $data,      // expected
+        ];
+
+        return $dataArr;
+    }
+    /**
+     * test RestServer5 - testing fallback (defaults) are set for response body (content-typ/gzip)
+     *
+     * @test
+     * @dataProvider RestServer5Provider
+     */
+    public function testRestServer5(
+        array $config,
+        array $server  = null,
+        array $query   = null,
+        $body          = null,
+        array $cookies = null,
+        array $files   = null,
+        $expected      = null
+    ) {
+        $contentType = 'application/json';
+        $RestServer = new RestServer( $config, $server, $query, $body, $cookies, $files );
+        $RestServer->setLogger( new RestServerLogger()); // test ###
+
+        $response = $RestServer->processRequest();
+
+        $this->assertEquals( 200, $response->getStatusCode());
+        $this->assertEquals( $contentType, $response->getHeader( ContentTypeHandler::CONTENTTYPE )[0] );
+
+        $body1       = $response->getBody();
+        $body1->rewind();
+        $body2       = $body1->getContents();
+        $body3       = @\gzdecode( $body2 );
+        $body4       = (array) @\json_decode( $body3, true );
+        $this->assertEquals( $expected, $body4 );
         $RestServer->__destruct();
     }
 }

@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.8.0
+ * Version   0.9.23
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -48,120 +48,121 @@ use Kigkonsult\RestServer\Handlers\CorsHandler;
  *  - all attached service methods
  *  - NON-disallowed methods (ex HEAD/OPTIONS)
  *
- * This config is included in the RestServer config with key CorsHandler::CORS
- *
  * NOTE, most config keys here have only test values set,
  * include ONLY on after update!!
  *
  * ex
  * $config[CorsHandler::CORS] = include 'cfg/cfg.2.cors.php';
  */
-$corscfg = [];
+$corsCfg = [];
 
-    /**
-     * errorCode1
-     *
-     * value type : int
-     *
-     * statusCode for response if origin is expected but not found,
-     * default 400, 'Bad request', set only here if other !!
-     *
-     */
-$corscfg[CorsHandler::ERRORCODE1] = 400;
+/**
+ * Ignore origin header
+ *
+ * value type : bool
+ *
+ * default false (or not set)
+ *
+ */
+$corsCfg[RestServer::IGNORE] = true;
 
-    /**
-     * errorCode2
-     *
-     * value type : int
-     *
-     * statusCode for response
-     *   if origin is found but NO match,
-     *   or origin found but not expected (NOT alterable)
-     * default 403, 'Forbidden', set only here if other !!
-     */
-$corscfg[CorsHandler::ERRORCODE2] = 403;
+/**
+ * statusCode for response if origin is expected but not found,
+ *
+ * value type : int
+ *
+ * default 400, 'Bad request', set only here if other !!
+ *
+ */
+$corsCfg[CorsHandler::ERRORCODE1] = 400;
 
-    /**
-     * errorCode3
-     *
-     * value type : int
-     *
-     * statusCode for response
-     *   if contents in request header Access-Control-Request-Method,
-     *     is NOT accepted by rest services definitions (method)
-     * default 406, 'Not Acceptable', set only here if other !!
-     */
-$corscfg[CorsHandler::ERRORCODE3] = 406;
+/**
+ * statusCode for response
+ *   if origin is found but NO match,
+ *   or origin found but not expected
+ *
+ * value type : int
+ *
+ * default 403, 'Forbidden', set only here if other !!
+ */
+$corsCfg[CorsHandler::ERRORCODE2] = 403;
 
-    /**
-     * errorCode4
-     *
-     * value type : int
-     *
-     * statusCode for response
-     *   if contents in request header Access-Control-Request-Header
-     *     is NOT in Access-Control-Allow-Headers, below
-     * default 406, 'Not Acceptable', set only here if other !!
-     */
-$corscfg[CorsHandler::ERRORCODE4] = 406;
+/**
+ * statusCode for response
+ *   if contents in request header Access-Control-Request-Method,
+ *     is NOT accepted by rest services definitions (method)
+ *
+ * value type : int
+ *
+ * default 406, 'Not Acceptable', set only here if other !!
+ */
+$corsCfg[CorsHandler::ERRORCODE3] = 406;
 
-    /**
-     * allow
-     *
-     * value type : string[]
-     *
-     * Will match request header 'Origin'
-     * Cfg contains accepted origins, (uri-scheme), uri-host, (uri-port)
-     * ['*'] accepts all
-     * request 'Origin' value will be used in response
-     */
-$corscfg[RestServer::ALLOW] = ['*'];
+/**
+ * statusCode for response
+ *   if contents in request header Access-Control-Request-Header
+ *     is NOT in Access-Control-Allow-Headers, below
+ *
+ * value type : int
+ *
+ * default 406, 'Not Acceptable', set only here if other !!
+ */
+$corsCfg[CorsHandler::ERRORCODE4] = 406;
 
-    /**
-     * Access-Control-Allow-Headers
-     *
-     * value type : string[]
-     *
-     * allowed (non-simple) headers
-     * optional
-     * Checked in checking preflight request header Access-Control-Request-Header
-     * Used in (preflight request) response header Access-Control-Allow-Headers
-     */
-$corscfg[CorsHandler::ACCESSCONTROLALLOWHEADERS] = ['x-header'];
+/**
+ * Will match request header 'Origin'
+ * Cfg contains accepted origins, (uri-scheme), uri-host, (uri-port)
+ * ['*'] accepts all
+ *
+ * value type : string[]
+ *
+ * request 'Origin' value will be used in response
+ */
+$corsCfg[RestServer::ALLOW] = ['*'];
 
-    /**
-     * Access-Control-Max-Age
-     *
-     * value type : int ()
-     *
-     * in preflight request response only
-     * optional
-     * Used in response header Access-Control-Max-Age
-     */
-$corscfg[CorsHandler::ACCESSCONTROLMAXAGE] = 200;
+/**
+ * allowed (non-simple) headers
+ *
+ * value type : string[]
+ *
+ * optional
+ * Checked in checking preflight request header Access-Control-Request-Header
+ * Used in (preflight request) response header Access-Control-Allow-Headers
+ */
+$corsCfg[CorsHandler::ACCESSCONTROLALLOWHEADERS] = ['x-header'];
 
-    /**
-     * Access-Control-Expose-Headers
-     *
-     * value type : null|string[]
-     *
-     * headers to expose (in the NON-preflight response)
-     * optional, see also Access-Control-Allow-Headers above
-     * Used in response header Access-Control-Expose-Headers
-     * Note, empty value will result in an empty response header
-     */
-$corscfg[CorsHandler::ACCESSCONTROLEXPOSEHEADERS] = ['x-header'];
+/**
+ * Max age
+ *
+ * value type : int ()
+ *
+ * in preflight request response only
+ * optional
+ * Used in response header Access-Control-Max-Age
+ */
+$corsCfg[CorsHandler::ACCESSCONTROLMAXAGE] = 200;
 
-    /**
-     * Access-Control-Allow-Credentials
-     *
-     * value type : bool
-     *
-     * true  : cookies are allowed, response header is sent
-     * false : (or missing), cookies are not allowed, no response header
-     * optional
-     * Used in response header Access-Control-Allow-Credentials
-     */
-$corscfg[CorsHandler::ACCESSCONTROLALLOWCREDENTIALS] = true;
+/**
+ * headers to expose (in the NON-preflight response)
+ *
+ * value type : null|string[]
+ *
+ * optional, see also Access-Control-Allow-Headers above
+ * Used in response header Access-Control-Expose-Headers
+ * Note, empty value will result in an empty response header
+ */
+$corsCfg[CorsHandler::ACCESSCONTROLEXPOSEHEADERS] = ['x-header'];
 
-return $corscfg;
+/**
+ * Allow credentials
+ *
+ * value type : bool
+ *
+ * true  : cookies are allowed, response header is sent
+ * false : (or missing), cookies are not allowed, no response header
+ * optional
+ * Used in response header Access-Control-Allow-Credentials
+ */
+$corsCfg[CorsHandler::ACCESSCONTROLALLOWCREDENTIALS] = true;
+
+return $corsCfg;

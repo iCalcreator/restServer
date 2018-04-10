@@ -27,62 +27,33 @@
  *           If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace Kigkonsult\RestServer\Handlers\EncodingHandlers;
+namespace Kigkonsult\RestServer;
 
-use Kigkonsult\RestServer\Handlers\Exceptions\ZlibErrorException;
+use Psr\Http\Message\ResponseInterface as Master;
+use RuntimeException;
 
-/**
- * GzipHandler manages 'gzip' decode/encode operations
- */
-class GzipHandler implements EncodingInterface
+interface ResponseInterface extends Master
 {
     /**
-     * Uncompress gzipped data
+     * Return rawBody
      *
-     * @param string $data
-     * @param int   $level
-     * @param int   $options
-     * @return string
-     * @static
-     * @throws ZlibErrorException
+     * @return mixed
      */
-    public static function deCode(
-        $data,
-        $level = null,
-        $options = null
-    ) {
-        $uncompressed = @\gzdecode( $data );
-        if ( false !== $uncompressed ) {
-            return $uncompressed;
-        }
-        throw new ZlibErrorException( __METHOD__, 500 );
-    }
+    public function getRawBody();
 
     /**
-     * Compress data as gzip
+     * Return an instance with rawBody
      *
-     * @param mixed $data
-     * @param int   $level
-     * @param int   $options
-     * @return string
-     * @static
-     * @throws ZlibErrorException
+     * @param mixed $rawBody
+     * @return static
      */
-    public static function enCode(
-        $data,
-        $level = null,
-        $options = null
-    ) {
-        if ( empty( $level )) {
-            $level = -1;
-        }
-        if ( empty( $options )) {
-            $options = FORCE_GZIP;
-        }
-        $compressed = @\gzencode( $data, $level, $options );
-        if ( false !== $compressed ) {
-            return $compressed;
-        }
-        throw new ZlibErrorException( __METHOD__, 500 );
-    }
+    public function withRawBody( $rawBody = null );
+
+    /**
+     * Return response body from rawBody or body(stream)
+     *
+     * @return mixed
+     * @throws RuntimeException
+     */
+    public function getResponseBody();
 }
