@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.25
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -71,7 +71,7 @@ class RestServer
     /**
      * @var string version
      */
-    private static $version = '0.9.23';
+    private static $version = '0.9.25';
 
     /**
      * @var string misc
@@ -183,6 +183,35 @@ class RestServer
     private $finalHandler = null;
 
     /**
+     * Return class instance using factory method
+     *
+     * @param array $config
+     * @param array $server  $_SERVER superglobal
+     * @param array $query   $_GET    superglobal
+     * @param array $body    $_POST   superglobal
+     * @param array $cookies $_COOKIE superglobal
+     * @param array $files   $_FILES  superglobal
+     * @return static
+     */
+    public static function factory(
+        array $config  = null,
+        array $server  = null,
+        array $query   = null,
+        array $body    = null,
+        array $cookies = null,
+        array $files   = null
+    ) {
+        return new self(
+            $config,
+            $server,
+            $query,
+            $body,
+            $cookies,
+            $files
+        );
+    }
+
+    /**
      * Class constructor
      *
      * @param array $config
@@ -213,7 +242,7 @@ class RestServer
             $this->addFinalHandlerFromConfig( $this->config );
         }
         catch ( Exception $e ) {
-            $this->request = $this->request->setAttribute( self::ERROR, $e );
+            $this->request = $this->request->withAttribute( self::ERROR, $e );
         }
     }
 
@@ -255,6 +284,24 @@ class RestServer
     }
 
     /**
+     * Init config
+     *
+     * @param null|array $config
+     * @access private
+     */
+    private function initConfig(
+        $config = null
+    ) {
+        if( empty( $config ))
+            $config = [];
+        if( ! isset( $config[self::INIT] ))
+            $config[self::INIT] = \microtime( true );
+        if( ! isset( $config[self::CORRELATIONID] ))
+            $config[self::CORRELATIONID] = strtoupper( bin2hex( openssl_random_pseudo_bytes( 16) ));
+        $this->config           = $config;
+    }
+
+    /**
      * Set config
      *
      * @param array $config
@@ -271,24 +318,6 @@ class RestServer
         $this->attachRestServicesFromConfig( $config );
         $this->addFinalHandlerFromConfig( $config );
         return $this;
-    }
-
-    /**
-     * Init config
-     *
-     * @param null|array $config
-     * @access private
-     */
-    private function initConfig(
-        $config = null
-    ) {
-        if( empty( $config ))
-            $config = [];
-        if( ! isset( $config[self::INIT] ))
-            $config[self::INIT] = \microtime( true );
-        if( ! isset( $config[self::CORRELATIONID] ))
-            $config[self::CORRELATIONID] = strtoupper( bin2hex( openssl_random_pseudo_bytes( 16) ));
-        $this->config           = $config;
     }
 
     /**
@@ -332,7 +361,6 @@ class RestServer
             $corrId = $this->config[self::CORRELATIONID] . self::$space;
             self::log( $corrId . LogUtilHandler::jTraceEx( $error ), self::ERROR );
             self::log( $corrId . LogUtilHandler::getRequestToString( $this->request ), self::ERROR );
-            $this->response     = $this->response->withStatus( 500 );   // Internal server error...
             $this->preHandlers  = [];
             $this->services     = [];
             $this->postHandlers = [];

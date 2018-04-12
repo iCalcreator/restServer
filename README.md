@@ -44,7 +44,7 @@ $restGetServiceDef = [
 ];
 
 // Attach the rest service(s) and fire of the server
-(new RestServer())->attachRestService( $restGetServiceDef )->run();
+RestServer::factory()->attachRestService( $restGetServiceDef )->run();
 ```
 More example usage:
 

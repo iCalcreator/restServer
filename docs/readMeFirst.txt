@@ -5,7 +5,7 @@ This file is a part of restServer.
 
 Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
 Link      http://kigkonsult.se/restServer/index.php
-Version   0.9.23
+Version   0.9.25
 License   Subject matter of licence is the software restServer.
           The above copyright, link, package and version notices and
           this licence notice shall be included in all copies or
@@ -33,7 +33,7 @@ rest services made easy
 -----------------------
 
 the purpose for restServer is to offer developers, as simple as possible,
-rest service API for their applications.
+rest service and API for their applications.
 
 "Everything should be made as simple as possible, but not simpler."
 [Albert Einstein]
@@ -42,7 +42,7 @@ restServer is based on and credits authors of
 
 PSR-7 HTTP message interfaces
  - https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-7-http-message.md
-PSR HTTP message Util interfaces
+PSR-7 HTTP message Util interfaces
 - https://github.com/php-fig/http-message-util
 zend-diactoros
  - https://github.com/zendframework/zend-diactoros
@@ -144,8 +144,9 @@ For delivering a response message, use
   response::withRawBody( data )
 
 The method is not PSR HTTP standard but included to simplify response message
-delivery. Later (opt.) serializing and encoding (with set headers) are taken
-care of automatically, using restServer builtin supported serializers/encoders.
+delivery. Later (opt.) serializing and encoding (with headers) are taken care
+of automatically, using restServer builtin supported serializing/encoding
+handlers.
 
 
 SERVICE DEFINITION
@@ -183,7 +184,7 @@ The service definition callback must be invoked with two arguments,
 The callback must return a ResponseInterface response.
 
 Service definition can be attached using
-  restServer::attachRestService(),
+  RestServer::attachRestService(),
   using callback from RestServer:getAttachRestServiceCallback(),
   config,
 all described below.
@@ -202,7 +203,7 @@ For return a response message, use
   response::withRawBody( data )
 
 There is a simple builtin 'ping' service, ex. used when checking service is
-alive, attached using the builtin method restServer::getPingServiceDef().
+alive, attached using the builtin method RestServer::getPingServiceDef().
 The included 'pingIndex.php' is a usage example.
 
 
@@ -212,8 +213,8 @@ RESTSERVER HANDLERS
 For CORS (Cross-Origin Resource Sharing) builtin handler, review config (below)
 and cfg/cfg.2.cors.php for details.
 
-restServer unserializing and decoding builtin and custom handlers are invoked
-  before any callback exec,
+restServer builtin unserializing and decoding and opt. custom handlers are
+  invoked before any callback exec,
 opt. serializing and encoding builtin handlers
   after
 the finalHandler (if set),
@@ -336,37 +337,46 @@ if ( ! empty( $logger ) && method_exists( $logger, $prio )) {
 RESTSERVER METHODS
 ------------------
 
-restServer::__construct()
-restServer::__construct( config )
+RestServer::factory()
+RestServer::factory( config )
 
+  return new RestServer object instance
+  static
   config : array
-  restServer constructor
+  see cfg/cfg.RestServer.php
+
+RestServer::__construct()
+RestServer::__construct( config )
+
+  RestServer constructor
+  config : array
   see cfg/cfg.RestServer.php
 
 
-restServer::setConfig( config )
+RestServer::setConfig( config )
 
   config : array
+  see cfg/cfg.RestServer.php
   throws InvalidArgumentException
     (for handlers or services set upp and attached in config)
-  see cfg/cfg.RestServer.php
 
 
-restServer::addHandler( handler )
+RestServer::addHandler( handler )
 
   handler : one handler or (array) handlers
             custom handlers are described in TemplateHandler.php
-  throws InvalidArgumentException on error
+  throws InvalidArgumentException
 
 
-restServer::addFinalHandler( handler )
+RestServer::addFinalHandler( handler )
+
   handler : one handler
             custom handlers are described in TemplateHandler.php
-  throws InvalidArgumentException on error
+  throws InvalidArgumentException
 
 
-restServer::attachRestService( serviceDef );
-restServer::attachRestService( method, uri, callback );
+RestServer::attachRestService( serviceDef );
+RestServer::attachRestService( method, uri, callback );
 
   serviceDef : rest service definition as described in TemplateService.php
                [ method, uri, callback ]
@@ -376,30 +386,31 @@ restServer::attachRestService( method, uri, callback );
   throws InvalidArgumentException on unvalid arguments.
 
 
-restServer::detachRestService( $method, $uri );
+RestServer::detachRestService( $method, $uri );
 
   method     : request method(s)
   uri        : rest service uri
   return bool true on success
 
 
-restServer::getAttachRestServiceCallback()
+RestServer::getAttachRestServiceCallback()
 
   return method attachRestService as callback
   see TemplateService.php, last example
 
 
-restServer::getLogger()
+RestServer::getLogger()
 
+  return logger object instance
   static
   return opt. preset logger or null
 
 
-restServer::setLogger( logger )
+RestServer::setLogger( logger )
 
-  logger     : logger class instance
+  set logger object instance
   static
-  set logger class instance
+  logger     : logger object instance
 
 
 NEXT TO COME
