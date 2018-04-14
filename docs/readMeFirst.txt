@@ -5,7 +5,7 @@ This file is a part of restServer.
 
 Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
 Link      http://kigkonsult.se/restServer/index.php
-Version   0.9.25
+Version   0.9.26
 License   Subject matter of licence is the software restServer.
           The above copyright, link, package and version notices and
           this licence notice shall be included in all copies or
