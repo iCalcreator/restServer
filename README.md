@@ -4,7 +4,7 @@ restServer - rest services made easy
 restServer provides
 
  * a PSR HTTP message rest server
- * builtin serializers and decoders 
+ * builtin ip, cors, auth, serializing and decoding mgnt
  * API for your application
 
 Install
@@ -87,16 +87,17 @@ Rest service definition
 ----------------------
 
 You have to implement one or more rest service (callable) entries for your application logic.
-Each entry with one or more http request methods and a (single) uri (ex '/') form a service definition. The service definitions, attached to restServer,  are interfaces to your application logic.
+Each entry with one or more http request methods and a (single) uri (ex '/') form a service definition.
+The service definitions, attached to restServer, are interfaces to your application logic.
 
 Handlers
 --------
 
-restServer have builtin handlers managing messages serializing, en-/decoding
-and Cross-Origin Resource Sharing.
-Aside from rest service definitions, you can attach custom
-request message handler(s), invoked before any operation callback 
-as well as (a single) final handler, invoked after response is returned.
+restServer have builtin handlers managing IPnumber validation, Cross-Origin Resource Sharing,
+authentication, messages serializing and en-/decoding.
+As well as rest service definitions, you can attach custom
+request message handler(s), invoked before any operation callback.
+Also a custom (single) final handler can be attached, invoked after response is returned.
 
 Documentation
 -------------
@@ -108,7 +109,7 @@ In the restServer package docs folder are found
 
 
 For restServer issues, use [github].
-Due to the restServer development status (ver 0.9.26), review reports are appreciated!
+Due to the restServer development status (ver 0.9.123), review reports are appreciated!
 
 Credits and base software information
 -------------------------------------
@@ -120,7 +121,7 @@ Credits and base software information
 
 Built status
 ------------
-Dev 0.9.26
+Dev 0.9.123
 
 [PSR HTTP message interfaces]: https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-7-http-message.md
 [PSR HTTP message Util interfaces]: https://github.com/php-fig/http-message-util

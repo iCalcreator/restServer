@@ -1,6 +1,6 @@
 {
   "name": "kigkonsult/restserver",
-  "description": "rest services made easy, restServer, based on PSR http message, builtin serializers and decoders",
+  "description": "rest services made easy, restServer: PSR http message, builtin ip, cors, auth, serializers and decoders",
   "keywords": [
     "rest",
     "server",
@@ -15,12 +15,12 @@
   "type": "library",
   "license": "AGPL-1.0",
   "homepage": "https://github.com/iCalcreator/restserver",
-    "authors": [
-        {
-            "name": "Kjell-Inge Gustafsson",
-            "homepage": "https://kigkonsult.se/RestServer/index.php"
-        }
-    ],
+  "authors": [
+      {
+          "name": "Kjell-Inge Gustafsson",
+          "homepage": "https://kigkonsult.se/RestServer/index.php"
+      }
+  ],
   "support": {
     "issues": "https://github.com/iCalcreator/restserver/issues",
     "source": "https://github.com/iCalcreator/restServer"

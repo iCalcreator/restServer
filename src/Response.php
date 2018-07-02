@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -35,7 +35,9 @@ use Psr\Http\Message\StreamInterface;
 use RuntimeException;
 
 /**
- * Extended replica of Zend\Diactoros\Response with an added property rawBody and corresponding methods
+ * Extends Zend\Diactoros\Response with an added property rawBody and corresponding methods
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
  */
 /**
  * HTTP response encapsulation.
@@ -155,7 +157,7 @@ class Response implements ResponseInterface
     public function __construct($body = 'php://memory', $status = 200, array $headers = [])
     {
         $this->setStatusCode($status);
-        $this->stream = $this->getStream($body, 'wb+');
+        $this->stream = $this->getStream( $body, 'wb+' );
         $this->setHeaders($headers);
     }
 

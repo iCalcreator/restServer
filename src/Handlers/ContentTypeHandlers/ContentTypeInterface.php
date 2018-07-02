@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -31,6 +31,8 @@ namespace Kigkonsult\RestServer\Handlers\ContentTypeHandlers;
 
 /**
  * Inderface for contentTypes unserialization/serialization
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
  */
 interface contentTypeInterface
 {
@@ -41,7 +43,10 @@ interface contentTypeInterface
      * @param mixed  $options
      * @return string/array
      */
-    public static function unSerialize($data, $options = null);
+    public static function unSerialize(
+        $data,
+        $options = null
+    );
 
     /**
      * Serialize data
@@ -49,5 +54,8 @@ interface contentTypeInterface
      * @param mixed  $options
      * @return string
      */
-    public static function serialize($data, $options = null);
+    public static function serialize(
+        $data,
+        $options = null
+    );
 }

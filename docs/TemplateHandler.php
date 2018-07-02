@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -30,6 +30,8 @@
 /**
  * Template for Handlers
  *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ *
  * You can add three kind of Handlers:
  *
  * - General Handlers, fired of before service exec
@@ -42,18 +44,21 @@
 /**
  * General Handlers
  *
- * A handler (callable) can be
+ * A (callable) handler can be
  *   simple function
  *   anonymous function
- *   instantiated object+method, passed as an array: object, method name
- *   class name and static method, passed as an array: class, method name (factory method?)
- *   instantiated object, class has an (magic) __call method
- *   class name, class has an (magic) __callStatic method
- *   instantiated object, class has an (magic) __invoke method
+ *   instantiated object+method, passed as an array             : [object, methodName]
+ *   class name and static (factory?) method, passed as an array: [namespaceClassName, methodName]
+ *   instantiated object, class has an (magic) __call method    : object
+ *   class name, class has an (magic) __callStatic method       : namespaceClassName
+ *   instantiated object, class has an (magic) __invoke method  : object
  *
  * The callable MUST
  *   have two arguments, ServerRequestInterface and ResponseInterface
- *   return [ ServerRequestInterface, ResponseInterface ]
+ *   return array [ ServerRequestInterface, ResponseInterface ]
+ *
+ * Exceptions (if any), thrown from handler (as well as PHP errors), are catched,
+ * opt. logged and resulting in 500 response.
  *
  * The callable have access to all methods as described in
  *   Psr\Http\Message\ServerRequestInterface;

@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -40,6 +40,8 @@ use Exception;
 
 /**
  * EncodingHandler class
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
  *
  * Managing request headers Content-Encoding and Accept-Encoding
  * and manage message encode/decode
@@ -81,6 +83,7 @@ class EncodingHandler extends AbstractCteHandler
     /**
      * Class constants, header value
      */
+    const GZIP            = 'gzip';
     const IDENTITY        = 'identity';
 
     /**
@@ -101,7 +104,7 @@ class EncodingHandler extends AbstractCteHandler
      * @static
      */
     protected static $types = [
-        'gzip'         => 'Kigkonsult\\RestServer\\Handlers\\EncodingHandlers\\GzipHandler',
+        self::GZIP     => 'Kigkonsult\\RestServer\\Handlers\\EncodingHandlers\\GzipHandler',
         'deflate'      => 'Kigkonsult\\RestServer\\Handlers\\EncodingHandlers\\DeflateHandler',
         self::IDENTITY => 'Kigkonsult\\RestServer\\Handlers\\EncodingHandlers\\IdentityHandler',
     ];
@@ -125,6 +128,13 @@ class EncodingHandler extends AbstractCteHandler
         ServerRequestInterface $request,
         ResponseInterface      $response
     ) {
+        // in case of previous error, return at once
+        if( false !== $request->getAttribute( RestServer::ERROR, false )) {
+            return [
+                $request,
+                $response,
+            ];
+        }
         return self::validateHeader(
             $request,
             $response,
@@ -152,17 +162,18 @@ class EncodingHandler extends AbstractCteHandler
                 $response,
             ];
         }
-        $config = $request->getAttribute( RestServer::CONFIG, [] );
 
-        $default = ( isset( $config[self::ACCEPTENCODING][self::FALLBACK] ))
-                          ? $config[self::ACCEPTENCODING][self::FALLBACK]
-                          : \array_keys( self::$types)[0];
+        $config  = parent::getConfig(
+            $request,
+            self::ACCEPTENCODING,
+            [self::FALLBACK => self::GZIP]
+        );
 
         return self::validateHeader(
             $request,
             $response,
             self::ACCEPTENCODING,
-            $default,
+            $config[self::ACCEPTENCODING][self::FALLBACK],
             406     // not acceptable
         );
     }
@@ -175,10 +186,16 @@ class EncodingHandler extends AbstractCteHandler
      * @return array [ ServerRequestInterface, ResponseInterface ]
      * @static
      */
-    public static function deCode(
+    public static function deCodeRequest(
         ServerRequestInterface $request,
         ResponseInterface      $response
     ) {
+        if( parent::earlierErrorExists( $request )) {
+            return [
+                $request,
+                $response,
+            ];
+        }
         $encoding = $request->getAttribute( self::CONTENTENCODING, false );
         if ( false === $encoding ) {
             return [
@@ -195,19 +212,23 @@ class EncodingHandler extends AbstractCteHandler
             ];
         }
 
-        $config  = $request->getAttribute( RestServer::CONFIG, [] );
-        $level   = ( isset( $config[$encoding][self::DECODELEVEL] ))
-                          ? $config[$encoding][self::DECODELEVEL]
-                          : null;
-        $options = ( isset( $config[$encoding][self::DECODEOPTIONS] ))
-                          ? $config[$encoding][self::DECODEOPTIONS]
-                          : null;
+        $config  = parent::getConfig(
+            $request,
+            $encoding,
+            [self::DECODELEVEL => null, self::DECODEOPTIONS => null]
+        );
+
         $error   = false;
         try {
             $stream->rewind();
             $body  = $stream->getContents();
-            if ( ! empty( self::$types[$encoding] )) {
-                $body = self::$types[$encoding]::deCode( $body, $level, $options );
+            $handler  = self::getHandlerFor( $encoding );
+            if ( ! empty( $handler )) {
+                $body = $handler::deCode(
+                    $body,
+                    $config[$encoding][self::DECODELEVEL],
+                    $config[$encoding][self::DECODEOPTIONS]
+                );
             }
             if ( \is_array( $body ) || \is_object( $body )) {
                 $request = $request->withParsedBody( $body )
@@ -229,7 +250,7 @@ class EncodingHandler extends AbstractCteHandler
                 $request->withAttribute( RestServer::ERROR, true ),
                 $response->withStatus( 500 ),
                 $error,
-                RestServer::WARNING
+                RestServer::ERROR
             );
         } // end if
         return [
@@ -248,7 +269,7 @@ class EncodingHandler extends AbstractCteHandler
      * @return array [ ServerRequestInterface, ResponseInterface ]
      * @static
      */
-    public static function enCode(
+    public static function enCodeResponse(
         ServerRequestInterface $request,
         ResponseInterface      $response
     ) {
@@ -261,26 +282,28 @@ class EncodingHandler extends AbstractCteHandler
         }
 
         $response = $response->withHeader( self::CONTENTENCODING, $encoding );
-        if ( empty( self::$types[$encoding] )) { // no encoding required
+        $handler  = self::getHandlerFor( $encoding );
+        if ( empty( $handler )) { // no encoding required
             return [
                 $request,
                 $response,
             ];
         }
 
-        $config  = $request->getAttribute( RestServer::CONFIG, [] );
-        $level   = ( isset( $config[$encoding][self::ENCODELEVEL] ))
-                          ? $config[$encoding][self::ENCODELEVEL]
-                          : null;
-        $options = ( isset( $config[$encoding][self::ENCODEOPTIONS] ))
-                          ? $config[$encoding][self::ENCODEOPTIONS]
-                          : null;
+        $config  = parent::getConfig(
+            $request,
+            $encoding,
+            [self::ENCODELEVEL => null, self::ENCODEOPTIONS => null]
+        );
+
         $error   = false;
         try {
             $body     = $response->getResponseBody();
-            if ( ! empty( self::$types[$encoding] )) {
-                $body = self::$types[$encoding]::enCode( $body, $level, $options );
-            }
+            $body     = $handler::enCode(
+                $body,
+                $config[$encoding][self::ENCODELEVEL],
+                $config[$encoding][self::ENCODEOPTIONS]
+            );
             $response = $response->withRawBody( null )
                                  ->withBody( StreamFactory::createStream( $body ));
         } catch ( RuntimeException $e ) {
@@ -295,7 +318,7 @@ class EncodingHandler extends AbstractCteHandler
                 $request->withAttribute( RestServer::ERROR, true ),
                 $response->withStatus( 500 ),
                 $error,
-                RestServer::WARNING
+                RestServer::ERROR
             );
         } // end if
         return [

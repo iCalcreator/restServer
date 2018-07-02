@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -29,10 +29,14 @@
 
 namespace Kigkonsult\RestServer\Handlers\ContentTypeHandlers;
 
-// use PHPUnit_Framework_TestCase as TestCase; // PHPUnit < 6.1.0
-use PHPUnit\Framework\TestCase;          // PHPUnit > 6.1.0
+use PHPUnit\Framework\TestCase;
 use Kigkonsult\RestServer\Handlers\Exceptions\LIBXMLFatalErrorException;
 
+/**
+ * class XMLHandlerTest
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ */
 class XMLHandlerTest extends TestCase
 {
     /**

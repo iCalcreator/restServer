@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -30,14 +30,30 @@
 namespace Kigkonsult\RestServer;
 
 use Zend\Diactoros\ServerRequestFactory as master;
+use Kigkonsult\RestServer\Handlers\AuthenticationHandler;
 use Zend\Diactoros\ServerRequest;
 use Kigkonsult\RestServer\Handlers\RequestMethodHandler;
 use Kigkonsult\RestServer\Handlers\ContentTypeHandler;
+use Kigkonsult\RestServer\Handlers\IpHandler;
 use Kigkonsult\RestServer\Handlers\CorsHandler;
 use UnexpectedValueException;
 
+/**
+ * Extends Zend\Diactoros\ServerRequestFactory
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ */
 class ServerRequestFactory extends master
 {
+    /**
+     * @var string stream aids
+     */
+    private static $PHPINPUT        = 'php://input';
+    private static $PHPMEMORY       = 'php://memory';
+    private static $TXTSTREAMERROR1 = 'Can\'t open input stream';
+    private static $TXTSTREAMERROR2 = 'Can\'t copy input stream';
+    private static $TXTREADERROR3   = 'Can\'t read input stream';
+
     /**
      * {@inheritdoc}
      *
@@ -51,6 +67,8 @@ class ServerRequestFactory extends master
         array $cookies = null,
         array $files   = null
     ) {
+        static $COOKIE = 'cookie';
+        static $ERROR  = 'error';
         $server  = static::normalizeServer($server ?: $_SERVER);
         $files   = static::normalizeFiles($files ?: $_FILES);
         $headers = static::marshalHeaders($server);
@@ -59,39 +77,37 @@ class ServerRequestFactory extends master
 
         $method = RequestMethodHandler::getRequestMethod( $server );
 
-        if (null === $cookies && \array_key_exists('cookie', $headers)) {
-            $cookies = self::parseCookieHeader($headers['cookie']);
+        if (null === $cookies && \array_key_exists($COOKIE, $headers)) {
+            $cookies = self::parseCookieHeader($headers[$COOKIE]);
         }
 
-        $isNoBodyRequest = ( \in_array( $method, [
-            RequestMethodHandler::METHOD_DELETE,
-            RequestMethodHandler::METHOD_GET,
-            RequestMethodHandler::METHOD_HEAD,
-            RequestMethodHandler::METHOD_OPTIONS,
-        ]));
+        $isNoBodyRequest = RequestMethodHandler::isNoBodyRequest( $method );
         // ?? TRACE    (return 200)
         //    If the request is valid, the response SHOULD contain the entire request message
         //    in the entity-body, with a Content-Type of "message/http".
-        $stream = 'php://input';
+        $stream = self::$PHPINPUT;
         $error  = null;
         switch ( true ) {
             case( null != $body ):
                 break;
             case $isNoBodyRequest:
                 $body = $_GET;
-//              if ( false !== ( $pos = strpos( $uri, '?' ))) {
-//                  parse_str( substr( $uri, ( $pos +1 )), $body );
+//              if ( false !== ( $pos = \strpos( $uri, '?' ))) {
+//                  \parse_str( \substr( $uri, ( $pos +1 )), $body );
 //              }
                 break;
             case (( RequestMethodHandler::METHOD_POST == $method ) &&
                     ContentTypeHandler::hasFormHeader( $headers )):
-                $body = $_POST;
+                $body   = $_POST;
+                break;
+            case ( ContentTypeHandler::hasUrlEncodedBody( $headers )) :
+                $body   = self::getInputBodyFromPhpInput($error );
                 break;
             default:
-                $stream = self::getInputFromPhpInput( $error );
+                $stream = self::getInputStreamFromPhpInput( $error );
                 break;
         } // end switch
-        $ServerRequest = new ServerRequest(
+        $ServerRequest  = new ServerRequest(
             $server,
             $files,
             $uri,
@@ -101,53 +117,98 @@ class ServerRequestFactory extends master
             $cookies ?: $_COOKIE,
             $query ?: $_GET,
             $body,                // parsedBody
-            static::marshalProtocolVersion($server)
+            static::marshalProtocolVersion( $server )
         );
 
         return ( null !== $error )
-               ? $ServerRequest->withAttribute( 'error', $error )
+               ? $ServerRequest->withAttribute( $ERROR, $error )
                : $ServerRequest;
     }
 
     /**
-     * Return input from php://input (if POST/PUT/PATCH)
+     * Return input stream from php://input (if POST/PUT/PATCH)
      *
      * @param string $error
      * @return resource|string
      */
-    private static function getInputFromPhpInput(
+    private static function getInputStreamFromPhpInput(
         & $error = null
     ) {
+        static $R  = 'r';
+        static $RW = 'rw';
         $error  = null;
         \set_error_handler( function( $e ) use ( & $error ) {
             $error = $e;
         }, E_WARNING );
-        $input  = \fopen( 'php://input', 'r' );
-        $stream = \fopen( 'php://memory', 'rw' );
+        $input  = \fopen( self::$PHPINPUT, $R );
+        $stream = \fopen( self::$PHPMEMORY, $RW );
         \restore_error_handler();
         if ( null !== $error ) {
-            $error = 'Can\'t open input stream';
+            $error = self::$TXTSTREAMERROR1;
         } elseif ( ! \stream_copy_to_stream( $input, $stream )) {
-            $error = 'Can\'t copy input stream';
+            $error = self::$TXTSTREAMERROR2;
         }
         \fclose( $input );
+        return ( null !== $error ) ? self::$PHPINPUT : $stream;
+    }
 
-        return ( null !== $error ) ? 'php://input' : $stream;
+    /**
+     * Return input body from php://input (if POST/PUT/PATCH)
+     *
+     * @param string $error
+     * @return resource|string
+     */
+    private static function getInputBodyFromPhpInput(
+        & $error = null
+    ) {
+        static $MB_PARSE_STR = 'mb_parse_str';
+        static $R            = 'r';
+        $error  = null;
+        $body   = [];
+        \set_error_handler( function( $e ) use ( & $error ) {
+            $error = $e;
+        }, E_WARNING );
+        $input     = \fopen( self::$PHPINPUT, $R );
+        \restore_error_handler();
+        while( true ) {
+            if ( null !== $error ) {
+                $error = self::$TXTSTREAMERROR1;
+                break;
+            }
+            $body1 = \stream_get_contents( $input );
+            if ( false === $body1 ) {
+                $body  = [];
+                $error = self::$TXTREADERROR3;
+                break;
+            }
+            if( function_exists( $MB_PARSE_STR ))
+                \mb_parse_str( $body1, $body );
+            else
+                \parse_str(    $body1, $body );
+            break;
+        }
+        \fclose( $input );
+        return $body;
     }
 
     /**
      * {@inheritdoc}
      *
-     * Extends parent with all X-*, cors and IP headers
+     * Extends parent with all X-*, IP headers, Cors and Auth
      */
     public static function marshalHeaders(array $server)
     {
+        static $REDIRECTUC = 'REDIRECT_';
+        static $HTTPUC     = 'HTTP_';
+        static $CONTENTUC  = 'CONTENT_';
+        static $XUC        = 'X_';
+        static $XD         = 'X-';
         $headers = [];
         foreach ($server as $key => $value) {
             // Apache prefixes environment variables with REDIRECT_
             // if they are added by rewrite rules
-            if (\strpos($key, 'REDIRECT_') === 0) {
-                $key = \substr($key, 9);
+            if ( 0 === \strpos( $key, $REDIRECTUC )) {
+                $key = \substr( $key, 9);
 
                 // We will not overwrite existing variables with the
                 // prefixed versions, though
@@ -156,41 +217,41 @@ class ServerRequestFactory extends master
                 }
             }
 
-            if ($value && \strpos($key, 'HTTP_') === 0) {
-                $name           = \strtr(\strtolower(\substr($key, 5)), '_', '-');
+            if ( $value && ( 0 === \strpos( $key, $HTTPUC ))) {
+                $name           = self::lowerCaseAndUcReplByDashStr( \substr( $key, 5 ));
                 $headers[$name] = $value;
                 continue;
             }
 
-            if ($value && \strpos($key, 'CONTENT_') === 0) {
-                $name           = 'content-' . \strtolower(\substr($key, 8));
+            if ( $value && ( 0 === \strpos( $key, $CONTENTUC ))) {
+                $name           = self::lowerCaseAndUcReplByDashStr( $key );
                 $headers[$name] = $value;
                 continue;
             }
 
-            if ($value && \strpos($key, 'X_') === 0) {      // extended from here
-                // accept X_* headers
-                $name           = \strtolower( \str_replace( '_', '-', $key ));
+            if ( $value && IpHandler::isIpHeader( $key )) {
+                $name           = self::lowerCaseAndUcReplByDashStr( $key );
                 $headers[$name] = $value;
                 continue;
             }
-            if ($value && \strpos($key, 'X-') === 0) {
-                // accept X-* headers
+            if ( $value && CorsHandler::isCorsHeader( $key )) {
+                $name           = self::lowerCaseAndUcReplByDashStr( $key );
+                $headers[$name] = $value;
+                continue;
+            }
+            if ( $value && AuthenticationHandler::isAuthHeader( $key )) {
+                $name           = self::lowerCaseAndUcReplByDashStr( $key );
+                $headers[$name] = $value;
+                continue;
+            }
+            if ( $value && ( 0 === \strpos( $key, $XUC ))) { // accept X_* headers
+                $name           = self::lowerCaseAndUcReplByDashStr( $key );
+                $headers[$name] = $value;
+                continue;
+            }
+            if ( $value && ( 0 === \strpos( $key, $XD ))) {  // accept X-* headers
                 $name           = \strtolower( $key );
                 $headers[$name] = $value;
-                continue;
-            }
-            if ( $value ) {
-                // accept CORS-headers (if not already accepted)
-                $name = \strtr( \strtolower( $key ), '_', '-' );
-                if ( 0 == \strcasecmp( CorsHandler::ORIGIN, $name )) {
-                    $headers[$name] = $value;
-                } elseif ( 0 == \strcasecmp(
-                    CorsHandler::CORSHEADERPRSFIX,
-                                             \substr( $name, 0, \strlen( CorsHandler::CORSHEADERPRSFIX ))
-                )) {
-                    $headers[$name] = $value;
-                }
                 continue;
             }
         } // end foreach
@@ -199,12 +260,29 @@ class ServerRequestFactory extends master
     }
 
     /**
+     * Return lower case string with '_' replaced by '-'
+     *
+     * @param string $string
+     * @return string
+     * @access private
+     * @static
+     */
+    private static function lowerCaseAndUcReplByDashStr(
+        $string
+    ) {
+        static $UC         = '_';
+        static $D          = '-';
+        return \strtolower( \str_replace( $UC, $D, $string ));
+    }
+
+    /**
      * {@inheritdoc}
      *
      * private parent...
      */
-    private static function marshalProtocolVersion(array $server)
-    {
+    private static function marshalProtocolVersion(
+        array $server
+    ) {
         if ( ! isset($server['SERVER_PROTOCOL'])) {
             return '1.1';
         }

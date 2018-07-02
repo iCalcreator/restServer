@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -27,21 +27,20 @@
  *           If not, see <http://www.gnu.org/licenses/>.
  */
 
-    /**
-     * ConfigTest.php
-     * @since     2018-02-09
-     */
-
 namespace Kigkonsult\RestServer;
 
-// use PHPUnit_Framework_TestCase as TestCase; // PHPUnit < 6.1.0
-use PHPUnit\Framework\TestCase;          // PHPUnit > 6.1.0
+use PHPUnit\Framework\TestCase;
 use Kigkonsult\RestServer\Handlers\RequestMethodHandler;
 use Kigkonsult\RestServer\Handlers\CorsHandler;
 use Kigkonsult\RestServer\Handlers\ContentTypeHandler;
 use Kigkonsult\RestServer\Handlers\EncodingHandler;
 use Zend\Diactoros\ServerRequest;
 
+/**
+ * class ConfigTest
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ */
 class ConfigTest extends TestCase
 {
     /**
@@ -57,7 +56,7 @@ class ConfigTest extends TestCase
          * include RestServer config
          */
         $config1[RestServer::INIT]          = \microtime( true );
-        $config1[RestServer::CORRELATIONID] = strtoupper( bin2hex( openssl_random_pseudo_bytes( 16) ));
+        $config1[RestServer::CORRELATIONID] = RestServer::getGuid();
         $config1[RestServer::BASEURI]       = 'index.php';
         $config1[RestServer::DISALLOW]      = [
             RequestMethodHandler::METHOD_OPTIONS,

@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -30,7 +30,9 @@
 namespace Kigkonsult\RestServer\Handlers\EncodingHandlers;
 
 /**
- * IdentityHandler manages 'indentity' decode/encode operations
+ * IdentityHandler manages 'identity' decode/encode operations
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
  */
 class IdentityHandler implements EncodingInterface
 {

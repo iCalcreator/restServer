@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -42,6 +42,8 @@ use Exception;
 /**
  * ContentTypeHandler class
  *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ *
  * Managing request headers Content-Type and Accept
  * and manage message serializing
  *
@@ -70,6 +72,7 @@ class ContentTypeHandler extends AbstractCteHandler
     const ACCEPT             = 'Accept';
     const CONTENTTYPE        = 'Content-Type';
     const CONTENTLENGTH      = 'Content-Length';
+    const APPLICATIONJSON    = 'application/json';
 
     /**
      * Class constants, cfg keys
@@ -83,12 +86,12 @@ class ContentTypeHandler extends AbstractCteHandler
      * @static
      */
     protected static $types = [
-        'application/json'                  => __NAMESPACE__ . '\\ContentTypeHandlers\\JsonHandler',
+        self::APPLICATIONJSON               => __NAMESPACE__ . '\\ContentTypeHandlers\\JsonHandler',
         'application/xml'                   => __NAMESPACE__ . '\\ContentTypeHandlers\\XMLHandler',
         'text/xml'                          => __NAMESPACE__ . '\\ContentTypeHandlers\\XMLHandler',
         'application/x-www-form-urlencoded' => null,
         'multipart/form-data'               => null,
-        'text/plain'                        => null,
+        'text/plain'                        => __NAMESPACE__ . '\\ContentTypeHandlers\\AsIsHandler',
     ];
 
     /**
@@ -106,13 +109,14 @@ class ContentTypeHandler extends AbstractCteHandler
     private static $OptionsContentType = 'httpd/unix-directory';
 
     /**
-     * Return bool true if (POST=method and) content-type has form types
+     * Return contenttyp headers content
      *
      * @param array $headers
-     * @return bool
+     * @return string
+     * @access private
      * @static
      */
-    public static function hasFormHeader(
+    private static function getContentTypeHeader(
         array $headers
     ) {
         static $SC = ';';
@@ -123,13 +127,46 @@ class ContentTypeHandler extends AbstractCteHandler
         }
         $content = $headers[$cmpKey];
         if ( false !== \strpos( $content, $SC )) {
-            list( $content, $dummy ) = \explode( $SC, $content, 2 );
+            $content = \explode( $SC, $content, 2 )[0];
+        }
+        return $content;
+    }
+
+    /**
+     * Return bool true if (POST=method and) content-type has form types
+     *
+     * @param array $headers
+     * @return bool
+     * @static
+     */
+    public static function hasFormHeader(
+        array $headers
+    ) {
+        $content = self::getContentTypeHeader( $headers );
+        if ( false === $content ) {
+            return false;
         }
         $accepted = \array_slice( \array_keys( self::$types ), 3, 2 );
         if ( \in_array( $content, $accepted )) {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Return bool true if content-type reveals urlencoding
+     *
+     * @param array $headers
+     * @return bool
+     * @static
+     */
+    public static function hasUrlEncodedBody(
+        array $headers
+    ) {
+        $content = self::getContentTypeHeader( $headers );
+        return ( false === $content )
+            ? false
+            : ( 0 == \strcasecmp( $content, \array_keys( self::$types )[3] ));
     }
 
     /**
@@ -144,6 +181,12 @@ class ContentTypeHandler extends AbstractCteHandler
         ServerRequestInterface $request,
         ResponseInterface      $response
     ) {
+        if( parent::earlierErrorExists( $request )) {
+            return [
+                $request,
+                $response,
+            ];
+        }
         return self::validateHeader(
             $request,
             $response,
@@ -171,15 +214,18 @@ class ContentTypeHandler extends AbstractCteHandler
                 $response,
             ];
         } // end if
-        $config  = $request->getAttribute( RestServer::CONFIG, [] );
-        $fallback = ( isset( $config[self::ACCEPT][self::FALLBACK] ))
-                           ? $config[self::ACCEPT][self::FALLBACK]
-                           : \array_keys( self::$types)[0];
+
+        $config  = parent::getConfig(
+            $request,
+            self::ACCEPT,
+            [self::FALLBACK => self::APPLICATIONJSON]
+        );
+
         return self::validateHeader(
             $request,
             $response,
             self::ACCEPT,
-            $fallback,
+            $config[self::ACCEPT][self::FALLBACK],
             406     // not acceptable
         );
     }
@@ -192,10 +238,16 @@ class ContentTypeHandler extends AbstractCteHandler
      * @return array [ ServerRequestInterface, ResponseInterface ]
      * @static
      */
-    public static function unSerialize(
+    public static function unSerializeRequest(
         ServerRequestInterface $request,
         ResponseInterface      $response
     ) {
+        if( parent::earlierErrorExists( $request )) {
+            return [
+                $request,
+                $response,
+            ];
+        }
         $contentType = $request->getAttribute( ContentTypeHandler::CONTENTTYPE, false );
         if ( false === $contentType ) {
             return [
@@ -220,16 +272,22 @@ class ContentTypeHandler extends AbstractCteHandler
             ];
         } // end if
 
-        $config  = $request->getAttribute( RestServer::CONFIG, [] );
-        $options = ( isset( $config[$contentType][self::UNSERIALIZEOPTIONS] ))
-                          ? $config[$contentType][self::UNSERIALIZEOPTIONS]
-                          : null;
+        $config  = parent::getConfig(
+            $request,
+            $contentType,
+            [self::UNSERIALIZEOPTIONS => null]
+        );
+
         $error = false;
         try {
             $stream->rewind();
             $body     = $stream->getContents();
-            if ( ! empty( self::$types[$contentType] )) {
-                $body = self::$types[$contentType]::unSerialize( $body, $options );
+            $handler  = self::getHandlerFor( $contentType );
+            if ( ! empty( $handler )) {
+                $body = $handler::unSerialize(
+                    $body,
+                    $config[$contentType][self::UNSERIALIZEOPTIONS]
+                );
             }
             $request  = $request->withParsedBody( $body )
                                 ->withBody( StreamFactory::createStream());
@@ -249,7 +307,7 @@ class ContentTypeHandler extends AbstractCteHandler
                 $request->withAttribute( RestServer::ERROR, true ),
                 $response->withStatus( 500 ),
                 $error,
-                RestServer::WARNING
+                RestServer::ERROR
             );
         } // end if
         return [
@@ -268,14 +326,14 @@ class ContentTypeHandler extends AbstractCteHandler
      * @return array [ ServerRequestInterface, ResponseInterface ]
      * @static
      */
-    public static function serialize(
+    public static function serializeResponse(
         ServerRequestInterface $request,
         ResponseInterface      $response
     ) {
         $contentType = $request->getAttribute( ContentTypeHandler::ACCEPT, false );
 
         $body = self::getResponseBody( $response, $error );
-        if ( $error instanceof Exception ) {
+        if ( $error instanceof Exception ) { // read body error
             return self::doLogReturn(
                 $request->withAttribute( RestServer::ERROR, true ),
                 $response->withStatus( 500 )->withRawBody( null ),
@@ -291,48 +349,48 @@ class ContentTypeHandler extends AbstractCteHandler
                     $request->withAttribute( RestServer::ERROR, true ),
                     $response->withStatus( 500 ),
                     $error,
-                    RestServer::WARNING
+                    RestServer::ERROR
                 );
-            }
-            else {
-                $response = $response2;
             }
             return [
                 $request,
-                $response,
+                $response2,
             ];
         } // end if
 
         $response = $response->withHeader( self::CONTENTTYPE, $contentType );
-        if ( empty( self::$types[$contentType] )) { // no serializing for Content-Type
+        $handler  = self::getHandlerFor( $contentType );
+        if ( empty( $handler )) { // no serializing for Content-Type
             $response2 = self::setResponseBody( $response, $body, $error );
             if ( $error instanceof Exception ) {
                 return self::doLogReturn(
                     $request->withAttribute( RestServer::ERROR, true ),
                     $response->withStatus( 500 ),
                     $error,
-                    RestServer::WARNING
+                    RestServer::ERROR
                 );
-            }
-            else {
-                $response = $response2;
             }
             return [
                 $request,
-                $response,
+                $response2,
             ];
         } // end if
 
-        $config  = $request->getAttribute( RestServer::CONFIG, [] );
-        $options = ( isset( $config[$contentType][self::SERIALIZEOPTIONS] ))
-                          ? $config[$contentType][self::SERIALIZEOPTIONS]
-                          : null;
+        $config  = parent::getConfig(
+            $request,
+            $contentType,
+            [self::SERIALIZEOPTIONS => null]
+        );
+
         $error = false;
         try {
             if ( empty( $body )) {
                 $body = null;
             } elseif ( 0 !== $body ) {
-                $body = self::$types[$contentType]::serialize( $body, $options );
+                $body = $handler::serialize(
+                    $body,
+                    $config[$contentType][self::SERIALIZEOPTIONS]
+                );
             }
             $response = $response->withRawBody( null )
                                  ->withBody( StreamFactory::createStream( $body ));
@@ -352,7 +410,7 @@ class ContentTypeHandler extends AbstractCteHandler
                 $request->withAttribute( RestServer::ERROR, true ),
                 $response->withStatus( 500 ),
                 $error,
-                RestServer::WARNING
+                RestServer::ERROR
             );
         } // end if
         return [

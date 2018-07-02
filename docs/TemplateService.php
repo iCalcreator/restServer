@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -29,6 +29,8 @@
 /**
  * Template class for service definition
  *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ *
  * Service definition has three parts :
  *   $method,            GET, POST etc string|string[]
  *   $uri,               '/'
@@ -42,15 +44,18 @@
  * A callable can be
  *   simple function
  *   anonymous function
- *   instantiated object+method, passed as an array: object, method name
- *   class name and static method, passed as an array: class, method name (factory method?)
- *   instantiated object, class has an (magic) __call method
- *   class name, class has an (magic) __callStatic method
- *   instantiated object, class has an (magic) __invoke method
+ *   instantiated object+method, passed as an array             : [objectInstance, methodName]
+ *   class name and static (factory?) method, passed as an array: [namespaceClassName, methodName]
+ *   instantiated object, class has an (magic) __call method    : objectInstance
+ *   class name, class has an (magic) __callStatic method       : namespaceClassName
+ *   instantiated object, class has an (magic) __invoke method  : objectInstance
  *
  * Service definition callbacks MUST have arguments
  *   ServerRequestInterface and ResponseInterface.
  * Callback MUST return ResponseInterface.
+ *
+ * Exceptions (if any), thrown from callback (as well as PHP errors), are catched,
+ * opt. logged and resulting in 500 response.
  *
  * For service definition callbacks arguments, you have access to all
  * methods as described in

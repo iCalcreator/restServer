@@ -27,13 +27,31 @@
  *           If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace Kigkonsult\RestServer\Handlers\Exceptions;
+namespace Kigkonsult\RestServer\Handlers;
+
+use Kigkonsult\RestServer\Handlers\Exceptions\ExceptionError;
 
 /**
- * Class JsonErrorException
+ * class ErrorHandler
  *
  * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
  */
-class JsonErrorException extends \Exception
+class ErrorHandler
 {
+    /**
+     * Throw PHP error as ExceptionError
+     *
+     * @param int    $errno
+     * @param string $errstr
+     * @param string $errfile
+     * @param int    $errline
+     * @throws ExceptionError
+     * @static
+     */
+    public static function PhpErrors2Exception( $errno, $errstr, $errfile, $errline ) {
+        static $csp = ', ';
+        $message = ExceptionError::getSeverityText( $errno ) . $csp . $errstr;
+        throw new ExceptionError( $message, 500, $errno, $errfile, $errline );
+    }
+
 }

@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -34,16 +34,33 @@ use Kigkonsult\RestServer\RestServer;
 
 /**
  * Parent class for CorsHandler and AuthenticationHandler
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
  */
 abstract class AbstractCAHandler extends AbstractHandler implements HandlerInterface
 {
     /**
-     * Return config (if set), otherwise empty array
+     * Default config return error status keys
+     */
+    const ERRORCODE1                    = 'errorCode1';
+    const ERRORCODE2                    = 'errorCode2';
+    const ERRORCODE3                    = 'errorCode3';
+    const ERRORCODE4                    = 'errorCode4';
+    const ERRORCODE5                    = 'errorCode5';
+
+    /**
+     * misc.
+     */
+    protected static $US = '_';
+    protected static $D  = '-';
+
+    /**
+     * Return array config for key + opt. updated defaults + correlation-id
      *
-     * Updates default error status return codes
      * @param ServerRequestInterface $request
      * @param string                 $key
      * @param array                  $defaults
+     * @param array                  $statusCodesWithAltLogPrio
      * @return array
      * @access protected
      * @static
@@ -51,20 +68,34 @@ abstract class AbstractCAHandler extends AbstractHandler implements HandlerInter
     protected static function getConfig(
         ServerRequestInterface $request,
                                $key,
-                         array $defaults
+                         array $defaults,
+                         array $statusCodesWithAltLogPrio
     ) {
         $config = $request->getAttribute( RestServer::CONFIG, [] );
-        if ( ! isset( $config[$key] )) {
-            return $defaults;
-        }
-
-        $cfg = $config[$key];
-        foreach ( $defaults as $default => $value ) {
-            if ( ! isset( $cfg[$default] )) {
-                $cfg[$default] = $value;
+        $cfg    = ( isset( $config[$key] )) ? $config[$key] : [];
+        foreach ( $defaults as $defaultKey => $defaultValue ) {
+            if ( ! isset( $cfg[$defaultKey] )) {
+                $cfg[$defaultKey] = $defaultValue;
             }
         }
-
+        if( ! empty( $statusCodesWithAltLogPrio )) {
+            foreach( $statusCodesWithAltLogPrio as $altKey ) {
+                if( ! is_array( $cfg[$altKey] )) {
+                    $cfg[$altKey] = [
+                        $cfg[$altKey],
+                        RestServer::WARNING,
+                    ];
+                }
+                if( ! is_int( $cfg[$altKey][0] )) {
+                    $cfg[$altKey][0] = $defaults[$altKey];
+                }
+                if(( RestServer::WARNING != $cfg[$altKey][1] ) &&
+                   ( RestServer::ERROR   != $cfg[$altKey][1] )) {
+                    $cfg[$altKey][1] = RestServer::WARNING;
+                }
+            }
+        }
+        $cfg[RestServer::CORRELATIONID] = $config[RestServer::CORRELATIONID];
         return $cfg;
     }
 }

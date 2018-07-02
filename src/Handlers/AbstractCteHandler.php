@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -36,6 +36,8 @@ use RuntimeException;
 
 /**
  * Parent class for contentTypeHandler and encodingHandler
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
  */
 abstract class AbstractCteHandler extends AbstractHandler implements HandlerInterface
 {
@@ -55,8 +57,10 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
         $type,
         $handler
     ) {
-        $class                               = \get_called_class();
-        $class::$types[\strtolower( $type )] = $handler;
+        $class      = \get_called_class();
+        $classTypes = & $class::$types;
+        $type       = \strtolower( $type );
+        $classTypes[$type] = $handler;
     }
 
     /**
@@ -69,13 +73,14 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
     public static function unRegister(
         $type
     ) {
-        $class   = \get_called_class();
-        $type    = \strtolower( $type );
-        $success = false;
-        if ( isset( $class::$types[$type] )) {
+        $class      = \get_called_class();
+        $classTypes = $class::$types;
+        $type       = \strtolower( $type );
+        $success    = false;
+        if ( isset( $classTypes[$type] )) {
             $success = true;
             $tmp = [];
-            foreach( $class::$types as $aType => $aValue ) {
+            foreach( $classTypes as $aType => $aValue ) {
                 if ( $aType != $type ) {
                     $tmp[$aType] = $aValue;
                 }
@@ -95,12 +100,13 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
     public static function getRegister(
         $type = null
     ) {
-        $class    = \get_called_class();
+        $class      = \get_called_class();
+        $classTypes = $class::$types;
         if ( null !== $type ) {
-            $type = \strtolower( $type );
-            return ( isset( $class::$types[$type] )) ? $class::$types[$type] : null;
+            $type   = \strtolower( $type );
+            return ( isset( $classTypes[$type] )) ? $classTypes[$type] : null;
         }
-        return $class::$types;
+        return $classTypes;
     }
 
     /**
@@ -125,8 +131,8 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
         $headerValue = ( $request->hasHeader( $headerKey ))
                        ? $request->getHeader( $headerKey )
                        : null;
-        if ( empty( $headerValue )) {
-            if ( empty( $fallback )) {
+        if( empty( $headerValue )) {
+            if( empty( $fallback )) {
                 return [
                     $request,
                     $response,
@@ -137,7 +143,7 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
         else {
             $value = self::getAcceptedValue( $headerValue );
         }
-        if ( empty( $value )) { // not found
+        if( empty( $value )) { // not found
             return self::doLogReturn(
                 $request->withAttribute( RestServer::ERROR, true ),
                 $response->withStatus( $errorCode ),
@@ -152,7 +158,7 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
             );
         } // end if
         return [
-            ( 0 != \strcasecmp( encodingHandler::IDENTITY, $value ))
+            ( 0 != \strcasecmp( EncodingHandler::IDENTITY, $value ))
                 ? $request->withAttribute( $headerKey, $value )
                 : $request,
             $response,
@@ -169,7 +175,7 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
     protected static function getAcceptedValue(
         array $types
     ) {
-        if ( empty( $types )) {
+        if( empty( $types )) {
             return null;
         }
         $cTypes = self::typesToArray( $types );
@@ -196,34 +202,35 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
         static $SC  = ';';
         static $QEQ = 'q=';
         $cTypes     = [];
-        foreach ( $types as $cType ) {
-            foreach ( \explode( self::COMMA, $cType ) as $theType ) {
-                while ( false !== \strpos( $theType, $SP2 )) {
+        foreach( $types as $cType ) {
+            foreach( \explode( self::COMMA, $cType ) as $theType ) {
+                while( false !== \strpos( $theType, $SP2 )) {
                     $theType = \str_replace( $SP2, self::$SP, $theType );
                 }
                 $theType = \strtolower( \trim( $theType ));
-                if ( false !== \strpos( $theType, $SC )) {
+                if( false !== \strpos( $theType, $SC )) {
                     $tmp = [];
-                    foreach ( \explode( $SC, $theType ) as $x => $t ) {
+                    foreach( \explode( $SC, $theType ) as $x => $t ) {
                         $t = \trim( $t );
-                        if ( false !== \strpos( $t, self::$SP )) { // skip tail
+                        if( false !== \strpos( $t, self::$SP )) { // skip tail
                             $t = \explode( self::$SP, $t, 2 )[0];
                         }
-                        if ( empty( $t )) {
+                        if( empty( $t )) {
                             continue;
                         }
-                        if ( empty( $x )) {
+                        if( empty( $x )) {
                             $tmp[] = $t; // first item
-                        } elseif ( $QEQ == \substr( $t, 0, 2 )) {
+                        }
+                        elseif( $QEQ == \substr( $t, 0, 2 )) {
                             $tmp[] = $t; // skip all but quality
                         }
                     } // end foreach
                     $theType = \implode( $SC, $tmp );
                 } // end if
-                elseif ( false !== \strpos( $theType, self::$SP )) { // skip tail
+                elseif( false !== \strpos( $theType, self::$SP )) { // skip tail
                     $theType = \explode( self::$SP, $theType, 2 )[0];
                 }
-                if ( ! isset( $cTypes[$theType] )) {
+                if( ! isset( $cTypes[$theType] )) {
                     $cTypes[$theType] = $theType;
                 }
             } // end foreach
@@ -246,15 +253,15 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
         static $SCQEQ  = ';q=';
         static $SORTER = ['self', 'sortfcn'];
         $sorted        = [];
-        foreach ( $types as $x => $typeToCheck ) {
+        foreach( $types as $x => $typeToCheck ) {
             $quality = 1; // the default accept quality (rating).
             // Check if there is a different quality.
-            if ( false !== \strpos( $typeToCheck, $SCQEQ )) {
+            if( false !== \strpos( $typeToCheck, $SCQEQ )) {
                 // Divide "type;q=X" into two parts: "type" and "quality"
                 list( $typeToCheck, $quality ) = \explode( $SCQEQ, $typeToCheck, 2 );
             } // end if
             // WARNING: zero quality is means, that type isn't supported! Thus skip them.
-            if ( ! empty( $quality )) {
+            if( ! empty( $quality )) {
                 $sorted[$typeToCheck] = [$quality, $x];
             }
         } // end foreach
@@ -275,7 +282,7 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
         array $a,
         array $b
     ) {
-        if ( $a[0] != $b[0] ) {
+        if( $a[0] != $b[0] ) {
             return ( $a[0] >= $b[0] ) ? -1 : 1;
         }
         return ( $a[1] <= $b[1] ) ? -1 : 1;
@@ -298,22 +305,69 @@ abstract class AbstractCteHandler extends AbstractHandler implements HandlerInte
         $astChars   = $class::$astChar;
         $astFound   = false;
         $found      = [];
-        foreach ( $types as $sType ) {
-            if ( $astChars == $sType ) {
+        foreach( $types as $sType ) {
+            if( $astChars == $sType ) {
                 $astFound = true;
                 continue;
             }
-            if ( \array_key_exists( $sType, $classTypes )) {
+            if( \array_key_exists( $sType, $classTypes )) {
                 $found[$sType] = $sType;
             }
         } // end foreach
-        if ( $astFound ) { // append at the end
-            foreach ( array_keys( $classTypes ) as $aType ) {
-                if ( ! isset( $found[$aType] )) {
+        if( $astFound ) { // append at the end
+            foreach( \array_keys( $classTypes ) as $aType ) {
+                if( ! isset( $found[$aType] )) {
                     $found[$aType] = $aType;
                 }
             } // end foreach
         } // end if
         return \array_values( $found );
     }
+
+    /**
+     * Get handler callback for type
+     *
+     * @param string $type
+     * @return null|callback
+     * @access protected
+     * @static
+     */
+    protected static function getHandlerFor(
+        $type
+    ) {
+        $class      = \get_called_class();
+        $classTypes = $class::$types;
+        if( empty( $classTypes[$type] )) {
+            return null;
+        }
+        return $classTypes[$type];
+    }
+
+    /**
+     * Get config with default set missing keys
+     *
+     * @param ServerRequestInterface $request
+     * @param string $headerKey
+     * @param array  $defaultKeyValues
+     * @return array
+     * @access protected
+     * @static
+     */
+    protected static function getConfig(
+        ServerRequestInterface $request,
+                               $headerKey,
+                         array $defaultKeyValues
+    ) {
+        $config  = $request->getAttribute( RestServer::CONFIG, [] );
+        foreach( $defaultKeyValues as $key => $value ) {
+            if( ! \array_key_exists( $headerKey, $config )) {
+                $config[$headerKey] = [];
+            }
+            if( ! \array_key_exists( $key, $config[$headerKey] )) {
+                $config[$headerKey][$key] = $value;
+            }
+        }
+        return $config;
+    }
+
 }

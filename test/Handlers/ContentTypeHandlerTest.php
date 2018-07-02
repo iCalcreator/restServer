@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -27,32 +27,44 @@
  *           If not, see <http://www.gnu.org/licenses/>.
  */
 
-    /**
-     *
-     * @since     2018-02-09
-     */
-
 namespace Kigkonsult\RestServer\Handlers;
 
-// use PHPUnit_Framework_TestCase as TestCase; // PHPUnit < 6.1.0
-use PHPUnit\Framework\TestCase;          // PHPUnit > 6.1.0
+use PHPUnit\Framework\TestCase;
 use Zend\Diactoros\ServerRequest;
 use Kigkonsult\RestServer\Response;
 use Kigkonsult\RestServer\RestServer;
 use Kigkonsult\RestServer\StreamFactory;
 use Kigkonsult\RestServer\Handlers\ContentTypeHandlers\XMLHandler;
 
+/**
+ * class ContentTypeHandlerTest
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ */
 class ContentTypeHandlerTest extends TestCase
 {
+    /**
+     * testregister provider
+     */
+    public function registerProvider()
+    {
+        $dataArr   = [];
+        $dataArr[] = [
+            'key',
+            'value'
+        ];
+        return $dataArr;
+    }
     /**
      * test register mgnt
      *
      * @test
+     * @dataProvider registerProvider
      */
-    public function testregister()
-    {
-        $key      = 'key';
-        $value    = 'value';
+    public function testregister(
+        $key,
+        $value
+    ) {
         $allTypes = ContentTypeHandler::getRegister();
         ContentTypeHandler::register( $key, $value );
         $this->assertEquals( $value, ContentTypeHandler::getRegister( $key ));
@@ -295,11 +307,11 @@ class ContentTypeHandlerTest extends TestCase
         $this->assertEquals( $contentType, $request->getAttribute( ContentTypeHandler::CONTENTTYPE, false ));
         $this->assertEquals( $contentType, $request->getAttribute( ContentTypeHandler::ACCEPT, false ));
         $response                   = new Response();
-        list( $request, $response ) = ContentTypeHandler::unserialize( $request, $response );
+        list( $request, $response ) = ContentTypeHandler::unserializeRequest( $request, $response );
         $data2                      = $request->getParsedBody();
         $this->assertEquals( $data, $data2 );
         $response                   = $response->withRawBody( $data2 );
-        list( $request, $response ) = ContentTypeHandler::serialize( $request, $response );
+        list( $request, $response ) = ContentTypeHandler::serializeResponse( $request, $response );
         list( $request, $response ) = ContentTypeHandler::setContentLength( $request, $response );
         $stream                     = $response->getBody();
         $stream->rewind();
@@ -376,11 +388,11 @@ class ContentTypeHandlerTest extends TestCase
         $this->assertEquals( $contentType, $request->getAttribute( ContentTypeHandler::CONTENTTYPE, false ));
         $this->assertEquals( $contentType, $request->getAttribute( ContentTypeHandler::ACCEPT, false ));
         $response                   = new Response();
-        list( $request, $response ) = ContentTypeHandler::unserialize( $request, $response );
+        list( $request, $response ) = ContentTypeHandler::unserializeRequest( $request, $response );
         $data2                      = $request->getParsedBody();
         $this->assertEquals( $arrayData, $data2 );
         $response                   = $response->withRawBody( $data2 );
-        list( $request, $response ) = ContentTypeHandler::serialize( $request, $response );
+        list( $request, $response ) = ContentTypeHandler::serializeResponse( $request, $response );
         $stream                     = $response->getBody();
         $stream->rewind();
         $data3                      = $stream->getContents();
@@ -414,7 +426,7 @@ class ContentTypeHandlerTest extends TestCase
         $response = new Response();
 
         $response                   = $response->withRawBody( $xml );
-        list( $request, $response ) = ContentTypeHandler::serialize( $request, $response );
+        list( $request, $response ) = ContentTypeHandler::serializeResponse( $request, $response );
 
         $stream = $response->getBody();
         $stream->rewind();

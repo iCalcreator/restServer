@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -38,6 +38,9 @@ use RuntimeException;
 
 /**
  * RequestMethodHandler manages Request-Method
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ *
  * http methods in RequestMethodInterface
  * @see https://tools.ietf.org/html/rfc7231#page-24
  */
@@ -78,6 +81,25 @@ class RequestMethodHandler extends AbstractHandler implements RequestMethodInter
         'X-HTTP-METHOD-OVERRIDE',
         'HTTP-X-HTTP-METHOD-OVERRIDE',
     ];
+
+    /**
+     * Return bool true if method is a no-body-request
+     *
+     * @param string $method
+     * @return bool
+     * @static
+     */
+    public static function isNoBodyRequest(
+        $method
+    ) {
+        return ( \in_array( $method, [
+            self::METHOD_DELETE,
+            self::METHOD_GET,
+            self::METHOD_HEAD,
+            self::METHOD_OPTIONS,
+        ]));
+    }
+
 
     /**
      * Return request method
@@ -137,7 +159,7 @@ class RequestMethodHandler extends AbstractHandler implements RequestMethodInter
     }
 
     /**
-     * Handler callback validating request method, if config set unvalid method returns 405
+     * Handler callback validating request method, if config set invalid method returns 405
      *
      * @param ServerRequestInterface $request
      * @param ResponseInterface      $response
@@ -147,8 +169,14 @@ class RequestMethodHandler extends AbstractHandler implements RequestMethodInter
         ServerRequestInterface $request,
         ResponseInterface      $response
     ) {
-        static $ERRORFMT2                           = 'No support for %s: %s';
-        $method                                     = $request->getMethod();
+        static $ERRORFMT2 = 'No support for %s: %s';
+        if( parent::earlierErrorExists( $request )) {
+            return [
+                $request,
+                $response,
+            ];
+        }
+        $method           = $request->getMethod();
         list( $allowedMethods, $disallowedMethods ) = self::getAccurateMethods( $request );
         if( self::isMethodAccepted( $method, $disallowedMethods, $allowedMethods )) {
             return [
@@ -211,7 +239,7 @@ class RequestMethodHandler extends AbstractHandler implements RequestMethodInter
         return (
             self::isValidRequestMethod( $method ) &&
             ! \in_array( $method, $disallowedMethods ) &&
-            \in_array( $method, $allowedMethods )
+              \in_array( $method, $allowedMethods )
         );
     }
 
@@ -308,8 +336,8 @@ class RequestMethodHandler extends AbstractHandler implements RequestMethodInter
         ServerRequestInterface $request,
         ResponseInterface      $response
     ) {
-        list( $allowedMethods, $disallowedMethods ) = self::getAccurateMethods( $request );
-        $response                                   = self::setResponseHeaderAllowed( $response, $allowedMethods );
+        $allowedMethods = self::getAccurateMethods( $request )[0];
+        $response       = self::setResponseHeaderAllowed( $response, $allowedMethods );
 
         $allowMethodUri = $request->getAttribute( RestServer::REQUESTMETHODURI, [] );
         foreach ( $allowedMethods as $method ) {

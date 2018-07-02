@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -37,7 +37,9 @@ use RuntimeException;
 use Exception;
 
 /**
- * Class XMLHandler manager XML unserialization/serialization
+ * Class XMLHandler manages XML unserialization/serialization
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
  */
 class XMLHandler implements ContentTypeInterface
 {
@@ -76,7 +78,12 @@ class XMLHandler implements ContentTypeInterface
         \libxml_disable_entity_loader( $saved1 );
         \libxml_use_internal_errors( $saved2 );                   // disable user error handling
         \libxml_clear_errors();
-        self::checkLIBXMLFatalError( $libXMLErrs, $xml );
+        try {
+            self::checkLIBXMLFatalError( $libXMLErrs, $xml );
+        }
+        catch( LIBXMLFatalErrorException $e ) {
+            throw $e;
+        }
         if ( false === $SimpleXMLElement ) {
             throw new SimplexmlLoadErrorException( $xmlString );
         }
@@ -119,7 +126,8 @@ class XMLHandler implements ContentTypeInterface
         static $FMT1 = '<?xml version="1.0"?>';
         static $TXT2 = 'xml data is no xml';
         static $TXT3 = 'xml data is no array';
-        static $FMT4 = '<?xml version="1.0"?><%1$s></%1$s>';
+/*      static $FMT4 = '<?xml version="1.0"?><%1$s></%1$s>'; */
+        static $FMT4 = '<?xml version="1.0" encoding="UTF-8"?><%1$s></%1$s>';
         if ( \is_string( $data )) {
             if ( \substr( $data, 0, 5 ) == \substr( $FMT1, 0, 5 )) {
                 return $data;
@@ -139,7 +147,12 @@ class XMLHandler implements ContentTypeInterface
         \libxml_disable_entity_loader( $saved1 );
         \libxml_use_internal_errors( $saved2 );              // disable user error handling
         \libxml_clear_errors();
-        self::checkLIBXMLFatalError( $libXMLErrs, $xml );
+        try {
+            self::checkLIBXMLFatalError( $libXMLErrs, $xml );
+        }
+        catch( LIBXMLFatalErrorException $e ) {
+            throw $e;
+        }
         if ( false === $xml ) {
             throw new SimplexmlLoadErrorException( \var_export( $data, true ));
         }
@@ -167,7 +180,7 @@ class XMLHandler implements ContentTypeInterface
         static $FMT3                   = '%s%s%s%s^%s';
         static $D                      = '-';
 //      static $LIBXMLwarning          = 'LIBXML Warning';
-//        static $LIBXMLrecoverableError = 'LIBXML (recoverable) Error';
+//      static $LIBXMLrecoverableError = 'LIBXML (recoverable) Error';
         static $LIBXMLfatalError       = 'LIBXML Fatal Error';
         $result                        = [];
         if ( empty( $errors )) {
@@ -208,10 +221,10 @@ class XMLHandler implements ContentTypeInterface
             $result[] = $str3 . $str1;
             $result[] = $str3 . $str2;
         }  // end foreach
-        if ( empty( $result )) {
-            return true;
+        if ( ! empty( $result )) {
+            throw new LIBXMLFatalErrorException( \implode( PHP_EOL, $result ));
         }
-        throw new LIBXMLFatalErrorException( \implode( PHP_EOL, $result ));
+        return true;
     }
 
     /**

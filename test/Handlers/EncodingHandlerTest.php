@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -27,15 +27,9 @@
  *           If not, see <http://www.gnu.org/licenses/>.
  */
 
-    /**
-     *
-     * @since     2018-02-09
-     */
-
 namespace Kigkonsult\RestServer\Handlers;
 
-// use PHPUnit_Framework_TestCase as TestCase; // PHPUnit < 6.1.0
-use PHPUnit\Framework\TestCase;          // PHPUnit > 6.1.0
+use PHPUnit\Framework\TestCase;
 use Zend\Diactoros\ServerRequest;
 use Kigkonsult\RestServer\Response;
 use Kigkonsult\RestServer\RestServer;
@@ -45,6 +39,11 @@ use Kigkonsult\RestServer\Handlers\ContentTypeHandlers\XMLHandler;
 use Kigkonsult\RestServer\Handlers\EncodingHandlers\DeflateHandler;
 use Kigkonsult\RestServer\Handlers\EncodingHandlers\GzipHandler;
 
+/**
+ * class EncodingHandlerTest
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ */
 class EncodingHandlerTest extends TestCase
 {
     /**
@@ -230,14 +229,14 @@ class EncodingHandlerTest extends TestCase
         $this->assertEquals( $encoding, $request->getAttribute( EncodingHandler::ACCEPTENCODING, false ));
 
         $response                   = new Response();
-        list( $request, $response ) = EncodingHandler::deCode( $request, $response );
-        list( $request, $response ) = ContentTypeHandler::unserialize( $request, $response );
+        list( $request, $response ) = EncodingHandler::deCodeRequest( $request, $response );
+        list( $request, $response ) = ContentTypeHandler::unserializeRequest( $request, $response );
         $data2                      = $request->getParsedBody();
         $this->assertEquals( $data, $data2 );
 
         $response                   = $response->withRawBody( $data2 );
-        list( $request, $response ) = ContentTypeHandler::serialize( $request, $response );
-        list( $request, $response ) = EncodingHandler::enCode( $request, $response );
+        list( $request, $response ) = ContentTypeHandler::serializeResponse( $request, $response );
+        list( $request, $response ) = EncodingHandler::enCodeResponse( $request, $response );
         list( $request, $response ) = ContentTypeHandler::setContentLength( $request, $response );
         $stream                     = $response->getBody();
         $stream->rewind();
@@ -328,14 +327,14 @@ class EncodingHandlerTest extends TestCase
         $this->assertEquals( $encoding, $request->getAttribute( EncodingHandler::ACCEPTENCODING, false ));
         $response = new Response();
 
-        list( $request, $response ) = EncodingHandler::deCode( $request, $response );
-        list( $request, $response ) = ContentTypeHandler::unserialize( $request, $response );
+        list( $request, $response ) = EncodingHandler::deCodeRequest( $request, $response );
+        list( $request, $response ) = ContentTypeHandler::unserializeRequest( $request, $response );
         $data2                      = $request->getParsedBody();
         $this->assertEquals( $arrayData, $data2 );
 
         $response                   = $response->withRawBody( $data2 );
-        list( $request, $response ) = ContentTypeHandler::serialize( $request, $response );
-        list( $request, $response ) = EncodingHandler::enCode( $request, $response );
+        list( $request, $response ) = ContentTypeHandler::serializeResponse( $request, $response );
+        list( $request, $response ) = EncodingHandler::enCodeResponse( $request, $response );
         list( $request, $response ) = ContentTypeHandler::setContentLength( $request, $response );
 
         $stream = $response->getBody();

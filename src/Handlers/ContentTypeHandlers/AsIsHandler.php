@@ -27,13 +27,47 @@
  *           If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace Kigkonsult\RestServer\Handlers\Exceptions;
+namespace Kigkonsult\RestServer\Handlers\ContentTypeHandlers;
 
 /**
- * Class JsonErrorException
+ * Class AsIsHandler manages nothing...
  *
  * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
  */
-class JsonErrorException extends \Exception
+class AsIsHandler implements ContentTypeInterface
 {
+    /**
+     * class constants & statics
+     * produces RFC4627-compliant JSON, capable of embedding into HTML.
+     */
+
+    /**
+     * Return data 'as is'
+     *
+     * @param mixed $data
+     * @param int   $decodeOptions
+     * @return mixed
+     * @static
+     */
+    public static function unserialize(
+        $data,
+        $decodeOptions = null
+    ) {
+        return $data;
+    }
+
+    /**
+     * Return data 'As Is'
+     *
+     * @param mixed $data
+     * @param int   $encodeOptions
+     * @return mixed
+     * @static
+     */
+    public static function serialize(
+        $data,
+        $encodeOptions = null
+    ) {
+        return $data;
+    }
 }

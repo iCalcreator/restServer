@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -29,11 +29,16 @@
 
 namespace Kigkonsult\RestServer;
 
-use PHPUnit\Framework\TestCase;          // PHPUnit > 6.1.0
+use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Kigkonsult\RestServer\Handlers\ContentTypeHandler;
 use Kigkonsult\RestServer\Handlers\EncodingHandler;
+use Exception;
+
+/**
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ */
 
 /**
  * key constants
@@ -44,6 +49,7 @@ define( 'HANDLERCNT', 'handlerCnt' );
 
 /**
  * class for handlers
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
  */
 class HandlerClass
 {
@@ -108,6 +114,52 @@ class HandlerClass
             $request,
             $response,
         ];
+    }
+
+    /**
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface      $response
+     * @return array [ ServerRequestInterface, ResponseInterface ]
+     * @throws Exception
+     */
+    public function templateHandler4Exception(
+        ServerRequestInterface $request,
+        ResponseInterface $response
+    ) {
+        if( true )
+            throw new Exception( 'testing');
+
+        return [
+            $request,
+            $response,
+        ];
+    }
+
+    /**
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface      $response
+     * @return array [ ServerRequestInterface, ResponseInterface ]
+     * @throws Exception
+     */
+    public function templateHandler4Err(
+        ServerRequestInterface $request,
+        ResponseInterface $response
+    ) {
+        $ErrorClass = new ErrorClass();
+        $ErrorClass->getValues()['test'] = 'test';
+
+        return [
+            $request->withAttribute( 'test', $ErrorClass->getValues()['test'] ),
+            $response,
+        ];
+    }
+}
+class ErrorClass
+{
+    private $values = [];
+
+    public function getValues() {
+        return $this->values;
     }
 }
 
@@ -178,6 +230,44 @@ class ServiceClass3
         $msg = $request->getAttribute( KEY, null );
 
         return $response->withRawBody( $msg );
+    }
+
+    /**
+     * Rest service callback throwing exception
+     *
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface      $response
+     * @return ResponseInterface
+     * @throws Exception
+     */
+    public function templateService3Exception(
+        ServerRequestInterface $request,
+        ResponseInterface      $response
+    ) {
+        if( true )
+            throw new Exception( 'testing');
+
+        $msg = $request->getAttribute( KEY, null );
+
+        return $response->withRawBody( $msg );
+    }
+
+    /**
+     * Rest service callback with php error
+     *
+     * @param ServerRequestInterface $request
+     * @param ResponseInterface      $response
+     * @return ResponseInterface
+     * @throws Exception
+     */
+    public function templateService3Err(
+        ServerRequestInterface $request,
+        ResponseInterface      $response
+    ) {
+        $ErrorClass = new ErrorClass();
+        $ErrorClass->getValues()['test'] = 'test';
+
+        return $response->withRawBody( $ErrorClass->getValues()['test'] );
     }
 }
 
@@ -296,6 +386,12 @@ class FinalHandlerClass
         return true;
     }
 }
+
+/**
+ * class RestServerTest
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ */
 class RestServerTest extends TestCase
 {
     /**
@@ -469,7 +565,7 @@ class RestServerTest extends TestCase
     ) {
         $RestServer = new RestServer( $config, $server, $query, $body, $cookies, $files );
         if ( defined( 'LOG' ) && LOG ){
-            $RestServer->setLogger( new RestServerLogger());
+            RestServer::setLogger( new RestServerLogger());
         }
         if( isset( $config[RestServer::FINALHANDLER] ))
             $RestServer->addFinalHandler( $config[RestServer::FINALHANDLER] );
@@ -674,7 +770,7 @@ class RestServerTest extends TestCase
     ) {
         $RestServer = new RestServer( $config, $server, $query, $body, $cookies, $files );
         if ( defined( 'LOG' ) && LOG ) {
-            $RestServer->setLogger( new RestServerLogger());
+            RestServer::setLogger( new RestServerLogger());
         }
 
         list( $method, $uri, $callback ) = \array_values( $config[RestServer::SERVICES][1] );
@@ -891,7 +987,7 @@ class RestServerTest extends TestCase
         $RestServer = new RestServer( null, $server, $query, $body, $cookies, $files );
         $RestServer->setConfig( $config );
         if ( defined( 'LOG' ) && LOG ) {
-            $RestServer->setLogger( new RestServerLogger());
+            RestServer::setLogger( new RestServerLogger());
         }
 
         foreach ( $services as $x => $service ) {
@@ -986,7 +1082,7 @@ class RestServerTest extends TestCase
         $RestServer = new RestServer( null, $server, $query, $body, $cookies, $files );
         $RestServer->setConfig( $config );
         if ( defined( 'LOG' ) && LOG ) {
-            $RestServer->setLogger( new RestServerLogger());
+            RestServer::setLogger( new RestServerLogger());
         }
 
         $response = $RestServer->processRequest();
@@ -1069,7 +1165,7 @@ class RestServerTest extends TestCase
         $RestServer = new RestServer( null, $server, $query, $body, $cookies, $files );
         $RestServer->setConfig( $config );
         if ( defined( 'LOG' ) && LOG ) {
-            $RestServer->setLogger( new RestServerLogger());
+            RestServer::setLogger( new RestServerLogger());
         }
         $RestServer->addHandler( $handler );
 
@@ -1159,7 +1255,7 @@ class RestServerTest extends TestCase
         $RestServer = new RestServer( null, $server, $query, $body, $cookies, $files );
         $RestServer->setConfig( $config );
         if ( defined( 'LOG' ) && LOG ) {
-            $RestServer->setLogger( new RestServerLogger());
+            RestServer::setLogger( new RestServerLogger());
         }
 
         $ServiceClass3->registerAsRestService( $RestServer->getAttachRestServiceCallback());
@@ -1280,7 +1376,9 @@ class RestServerTest extends TestCase
     ) {
         $contentType = 'application/json';
         $RestServer = new RestServer( $config, $server, $query, $body, $cookies, $files );
-        $RestServer->setLogger( new RestServerLogger()); // test ###
+        if ( defined( 'LOG' ) && LOG ) {
+            RestServer::setLogger( new RestServerLogger());
+        }
 
         $response = $RestServer->processRequest();
 
@@ -1295,4 +1393,209 @@ class RestServerTest extends TestCase
         $this->assertEquals( $expected, $body4 );
         $RestServer->__destruct();
     }
+
+    /**
+     * testRestServer6 provider
+     */
+    public function RestServer6Provider()
+    {
+        $dataArr       = [];
+
+        $HandlerClass  = new HandlerClass(); // --------------- test data set #0 . exception
+        $ServiceClass3 = new ServiceClass3();
+        $dataArr[]    = [
+            [  // config
+                RestServer::DEBUG    => true,
+                RestServer::BASEURI  => 'index.php',
+                RestServer::HANDLERS => [
+                    [  // handler 1
+                        $HandlerClass,
+                        'templateHandler4Exception',
+                    ],
+                ],
+                RestServer::SERVICES => [
+                    [  // service definition 1
+                        RestServer::METHOD   => 'GET',
+                        RestServer::URI      => '/user[/{id:\w+}]',
+                        RestServer::CALLBACK => [
+                            $ServiceClass3,
+                            'templateService3',
+                        ],
+                    ],
+                ],
+            ],
+            [  // server
+                'REQUEST_URI'          => 'http://anyHost.com/index.php/user?id=testUser',
+                'SERVER_NAME'          => 'anyHost.com',
+                'REQUEST_METHOD'       => 'GET',
+                'HTTP_ACCEPT'          => 'text/plain',
+                'HTTP_ACCEPT_ENCODING' => 'identity',
+            ],
+            null,       // query
+            [],         // (array) body
+            null,       // cookies
+            null,       // files
+        ];
+
+        $HandlerClass  = new HandlerClass(); // --------------- test data set #1 . err
+        $ServiceClass3 = new ServiceClass3();
+        $dataArr[]    = [
+            [  // config
+                RestServer::DEBUG    => true,
+                RestServer::BASEURI  => 'index.php',
+                RestServer::HANDLERS => [
+                    [  // handler 1
+                        $HandlerClass,
+                        'templateHandler4Err',
+                    ],
+                ],
+                RestServer::SERVICES => [
+                    [  // service definition 1
+                        RestServer::METHOD   => 'GET',
+                        RestServer::URI      => '/user[/{id:\w+}]',
+                        RestServer::CALLBACK => [
+                            $ServiceClass3,
+                            'templateService3',
+                        ],
+                    ],
+                ],
+            ],
+            [  // server
+                'REQUEST_URI'          => 'http://anyHost.com/index.php/user?id=testUser',
+                'SERVER_NAME'          => 'anyHost.com',
+                'REQUEST_METHOD'       => 'GET',
+                'HTTP_ACCEPT'          => 'text/plain',
+                'HTTP_ACCEPT_ENCODING' => 'identity',
+            ],
+            null,       // query
+            [],         // (array) body
+            null,       // cookies
+            null,       // files
+        ];
+
+        return $dataArr;
+    }
+
+    /**
+     * test RestServer6 - testing handler generating PHP err/throwing exception
+     *
+     * @test
+     * @dataProvider RestServer6Provider
+     */
+    public function testRestServer6(
+        array $config,
+        array $server  = null,
+        array $query   = null,
+        $body          = null,
+        array $cookies = null,
+        array $files   = null
+    ) {
+        $RestServer = new RestServer( null, $server, $query, $body, $cookies, $files );
+        $RestServer->setConfig( $config );
+        if ( defined( 'LOG' ) && LOG ) {
+            RestServer::setLogger( new RestServerLogger());
+        }
+
+        $response = $RestServer->processRequest();
+
+        $this->assertEquals( 500, $response->getStatusCode());
+        $RestServer->__destruct();
+    }
+
+    /**
+     * testRestServer7 provider
+     */
+    public function RestServer7Provider()
+    {
+        $dataArr       = [];
+
+        $HandlerClass  = new HandlerClass(); // --------------- test data set #0 - exception
+        $ServiceClass3 = new ServiceClass3();
+        $dataArr[]    = [
+            [  // config
+                RestServer::DEBUG    => true,
+                RestServer::BASEURI  => 'index.php',
+                RestServer::SERVICES => [
+                    [  // service definition 1
+                        RestServer::METHOD   => 'GET',
+                        RestServer::URI      => '/user[/{id:\w+}]',
+                        RestServer::CALLBACK => [
+                            $ServiceClass3,
+                            'templateService3Exception',
+                        ],
+                    ],
+                ],
+            ],
+            [  // server
+                'REQUEST_URI'          => 'http://anyHost.com/index.php/user?id=testUser',
+                'SERVER_NAME'          => 'anyHost.com',
+                'REQUEST_METHOD'       => 'GET',
+                'HTTP_ACCEPT'          => 'text/plain',
+                'HTTP_ACCEPT_ENCODING' => 'identity',
+            ],
+            null,       // query
+            [],         // (array) body
+            null,       // cookies
+            null,       // files
+        ];
+
+        $HandlerClass  = new HandlerClass(); // --------------- test data set #1 - php error
+        $ServiceClass3 = new ServiceClass3();
+        $dataArr[]    = [
+            [  // config
+                RestServer::DEBUG    => true,
+                RestServer::BASEURI  => 'index.php',
+                RestServer::SERVICES => [
+                    [  // service definition 1
+                        RestServer::METHOD   => 'GET',
+                        RestServer::URI      => '/user[/{id:\w+}]',
+                        RestServer::CALLBACK => [
+                            $ServiceClass3,
+                            'templateService3Err',
+                        ],
+                    ],
+                ],
+            ],
+            [  // server
+                'REQUEST_URI'          => 'http://anyHost.com/index.php/user?id=testUser',
+                'SERVER_NAME'          => 'anyHost.com',
+                'REQUEST_METHOD'       => 'GET',
+                'HTTP_ACCEPT'          => 'text/plain',
+                'HTTP_ACCEPT_ENCODING' => 'identity',
+            ],
+            null,       // query
+            [],         // (array) body
+            null,       // cookies
+            null,       // files
+        ];
+
+        return $dataArr;
+    }
+
+    /**
+     * test RestServer7 - testing rest service callback generating PHP err/throwing exception
+     *
+     * @test
+     * @dataProvider RestServer7Provider
+     */
+    public function testRestServer7(
+        array $config,
+        array $server  = null,
+        array $query   = null,
+        $body          = null,
+        array $cookies = null,
+        array $files   = null
+    ) {
+        $RestServer = new RestServer( null, $server, $query, $body, $cookies, $files );
+        $RestServer->setConfig( $config );
+        if ( defined( 'LOG' ) && LOG ) {
+            RestServer::setLogger( new RestServerLogger());
+        }
+
+        $response = $RestServer->processRequest();
+
+        $this->assertEquals( 500, $response->getStatusCode());
+        $RestServer->__destruct();
+    }
+
 }

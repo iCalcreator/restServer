@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -34,6 +34,11 @@ use Kigkonsult\RestServer\ResponseInterface;
 use Kigkonsult\RestServer\RestServer;
 use Exception;
 
+/**
+ * class AbstractHandler
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ */
 abstract class AbstractHandler implements HandlerInterface
 {
     /**
@@ -72,4 +77,18 @@ abstract class AbstractHandler implements HandlerInterface
             $response,
         ];
     }
+    /**
+     * Return bool true if earlier error exists
+     *
+     * @param ServerRequestInterface $request
+     * @return bool
+     * @access protected
+     * @static
+     */
+    protected static function earlierErrorExists(
+        ServerRequestInterface $request
+    ) {
+        return ( false !== $request->getAttribute( RestServer::ERROR, false ));
+    }
+
 }

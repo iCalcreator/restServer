@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -36,6 +36,8 @@ use Exception;
 
 /**
  * LogUtilHandler manages restServer handlers logging
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
  */
 class LogUtilHandler implements HandlerInterface
 {
@@ -132,8 +134,10 @@ class LogUtilHandler implements HandlerInterface
         ServerRequestInterface $request
     ) {
         $logger = RestServer::getLogger();
-        $config  = $request->getAttribute( RestServer::CONFIG, [] );
-        $corrId  = ( isset( $config[RestServer::CORRELATIONID] )) ? $config[RestServer::CORRELATIONID] . self::$SP : null;
+        $config = $request->getAttribute( RestServer::CONFIG, [] );
+        $corrId = ( isset( $config[RestServer::CORRELATIONID] ))
+                ? $config[RestServer::CORRELATIONID] . self::$SP
+                : null;
         if ( ! empty( $logger ) && \method_exists( $logger, RestServer::DEBUG )) {
             $logger->{RestServer::DEBUG}( $corrId . self::getRequestToString( $request ));
         }
@@ -150,8 +154,10 @@ class LogUtilHandler implements HandlerInterface
              ResponseInterface $response
     ) {
         $logger = RestServer::getLogger();
-        $config  = $request->getAttribute( RestServer::CONFIG, [] );
-        $corrId  = ( isset( $config[RestServer::CORRELATIONID] )) ? $config[RestServer::CORRELATIONID] . self::$SP : null;
+        $config = $request->getAttribute( RestServer::CONFIG, [] );
+        $corrId = ( isset( $config[RestServer::CORRELATIONID] ))
+                ? $config[RestServer::CORRELATIONID] . self::$SP
+                : null;
         if ( ! empty( $logger ) && \method_exists( $logger, RestServer::DEBUG )) {
             $logger->{RestServer::DEBUG}( $corrId . self::getResponseToString( $response ));
         }
@@ -177,8 +183,8 @@ class LogUtilHandler implements HandlerInterface
         }
         $trace    = $e->getTrace();
         $prev     = $e->getPrevious();
-        $code     = ( false != ( $c = $e->getCode())) ? \sprintf( '#%s ', $c ) : '';
-        $result[] = \sprintf('%s%s: %s%s', $starter, \get_class($e), $code, $e->getMessage());
+        $code     = ( false != ( $c = $e->getCode())) ? \sprintf( '#%s, ', $c ) : '';
+        $result[] = \sprintf( '%s%s: %s%s', $starter, \get_class( $e ), $code, $e->getMessage());
         $file     = $e->getFile();
         $line     = $e->getLine();
         while (true) {
@@ -190,11 +196,11 @@ class LogUtilHandler implements HandlerInterface
             $result[] = \sprintf(
                 ' at %s%s%s(%s%s%s)',
                 \count( $trace ) && \array_key_exists( 'class', $trace[0] ) ? \str_replace( '\\', '.', $trace[0]['class'] ) : '',
-                  \count( $trace ) && \array_key_exists(' class', $trace[0] ) && \array_key_exists( 'function', $trace[0] ) ? '.' : '',
-                     \count( $trace ) && \array_key_exists(' function', $trace[0] ) ? \str_replace( '\\', '.', $trace[0]['function'] ) : '(main)',
-                     $line === null ? $file : \basename( $file ),
-                     $line === null ? '' : ':',
-                     $line === null ? '' : $line
+                \count( $trace ) && \array_key_exists(' class', $trace[0] ) && \array_key_exists( 'function', $trace[0] ) ? '.' : '',
+                \count( $trace ) && \array_key_exists(' function', $trace[0] ) ? \str_replace( '\\', '.', $trace[0]['function'] ) : '(main)',
+                $line === null ? $file : \basename( $file ),
+                $line === null ? '' : ':',
+                $line === null ? '' : $line
             );
             if ( \is_array( $seen )) {
                 $seen[] = "$file:$line";

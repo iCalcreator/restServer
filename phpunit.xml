@@ -6,7 +6,7 @@ This file is a part of restServer.
 
 Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
 Link      http://kigkonsult.se/restServer/index.php
-Version   0.9.23
+Version   0.9.123
 License   Subject matter of licence is the software restServer.
           The above copyright, link, package and version notices and
           this licence notice shall be included in all copies or
@@ -50,6 +50,16 @@ License   Subject matter of licence is the software restServer.
         <testsuite name="RequestMethodHandler Tests">
             <file>./test/Handlers/RequestMethodHandlerTest.php</file>
         </testsuite>
+        <testsuite name="IpHandler Tests">
+            <file>./test/Handlers/IpHandlerTest.php</file>
+            <file>./test/Handlers/IpUtil/IpUtilTest.php</file>
+        </testsuite>
+        <testsuite name="CorsHandler Tests">
+            <file>./test/Handlers/CorsHandlerTest.php</file>
+        </testsuite>
+        <testsuite name="AuthenticationHandler Tests">
+            <file>./test/Handlers/AuthenticationHandlerTest.php</file>
+        </testsuite>
         <testsuite name="ContentTypeHandlers Tests">
             <file>./test/Handlers/ContentTypeHandlers/JsonHandlerTest.php</file>
             <file>./test/Handlers/ContentTypeHandlers/XMLHandlerTest.php</file>
@@ -64,9 +74,6 @@ License   Subject matter of licence is the software restServer.
         <testsuite name="EncodingHandler Tests">
             <file>./test/Handlers/EncodingHandlerTest.php</file>
         </testsuite>
-        <testsuite name="CorsHandler Tests">
-            <file>./test/Handlers/CorsHandlerTest.php</file>
-        </testsuite>
         <testsuite name="RestServer Tests">
             <file>./test/RestServerTest.php</file>
         </testsuite>
@@ -80,7 +87,12 @@ License   Subject matter of licence is the software restServer.
             <file>./src/Handlers/AbstractHandler.php</file>
             <file>./src/Handlers/RequestMethodHandler.php</file>
             <file>./src/Handlers/AbstractCAHandler.php</file>
+            <file>./src/Handlers/IpHandler.php</file>
+            <file>./src/Handlers/IpUtil/IpUtil.php</file>
+            <file>./src/Handlers/IpUtil/Ipv4Util.php</file>
+            <file>./src/Handlers/IpUtil/Ipv6Util.php</file>
             <file>./src/Handlers/CorsHandler.php</file>
+            <file>./src/Handlers/AuthenticationHandler.php</file>
             <file>./src/Handlers/AbstractCteHandler.php</file>
             <file>./src/Handlers/ContentTypeHandler.php</file>
             <file>./src/Handlers/ContentTypeHandlers/JsonHandler.php</file>
@@ -97,6 +109,7 @@ License   Subject matter of licence is the software restServer.
         </whitelist>
     </filter>
   <logging>
+      <!-- Remove or comment after your own choice-->
       <!-- All logs will be saved in 'testDocs' folder -->
       <log type="coverage-html"
            target="testDocs/PHPUnitCoverage"
@@ -122,6 +135,7 @@ License   Subject matter of licence is the software restServer.
            target="testDocs/testdox.txt"/>
   </logging>
     <php>
+        <!-- LOG=1 will log to (default) error_log -->
         <const name="LOG" value="0"/>
     </php>
 </phpunit>

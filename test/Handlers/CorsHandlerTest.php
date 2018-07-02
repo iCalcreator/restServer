@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -27,20 +27,19 @@
  *           If not, see <http://www.gnu.org/licenses/>.
  */
 
-    /**
-     *
-     * @since     2018-02-09
-     */
-
 namespace Kigkonsult\RestServer\Handlers;
 
-// use PHPUnit_Framework_TestCase as TestCase; // PHPUnit < 6.1.0
-use PHPUnit\Framework\TestCase;          // PHPUnit > 6.1.0
+use PHPUnit\Framework\TestCase;
 use Zend\Diactoros\ServerRequest;
 use Kigkonsult\RestServer\Response;
 use Kigkonsult\RestServer\RestServer;
 use Kigkonsult\RestServer\StreamFactory;
 
+/**
+ * class CorsHandlerTest
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ */
 class CorsHandlerTest extends TestCase
 {
     /**
@@ -51,15 +50,24 @@ class CorsHandlerTest extends TestCase
         $dataArr   = [];
         $dataArr[] = [
             [],
-            [],
+            [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
+            ],
         ];
         $dataArr[] = [
             [CorsHandler::ORIGIN => 'test.com'],
-            [],
+            [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
+            ],
         ];
         $dataArr[] = [
             [CorsHandler::ORIGIN => 'test.com'],
-            [CorsHandler::CORS => [RestServer::IGNORE => true]],
+            [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
+                CorsHandler::CORS         => [
+                    RestServer::IGNORE => true
+                ]
+            ],
         ];
 
         return $dataArr;
@@ -100,6 +108,7 @@ class CorsHandlerTest extends TestCase
         $dataArr[] = [
             [],
             [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
                 CorsHandler::CORS => [
                     RestServer::ALLOW => [
                         'test.com'
@@ -110,8 +119,11 @@ class CorsHandlerTest extends TestCase
         $dataArr[] = [
             [],
             [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
                 CorsHandler::CORS => [
-                    RestServer::ALLOW       => ['test.com'],
+                    RestServer::ALLOW       => [
+                        'test.com',
+                    ],
                     CorsHandler::ERRORCODE1 => 418,
                 ],
             ],
@@ -160,6 +172,7 @@ class CorsHandlerTest extends TestCase
                 CorsHandler::ORIGIN => 'wrong.com'
             ],
             [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
                 CorsHandler::CORS => [
                     RestServer::IGNORE      => false,
                     CorsHandler::ERRORCODE2 => 418,
@@ -171,7 +184,7 @@ class CorsHandlerTest extends TestCase
     }
 
     /**
-     * test validateCors, not require origin header and found and not ignore, ERRORCODE2
+     * test validateCors, if origin is not expected but found and not ignored, ERRORCODE2
      *
      * @test
      * @dataProvider validateCors3aProvider
@@ -197,8 +210,8 @@ class CorsHandlerTest extends TestCase
         );
         $this->assertTrue( $request->getAttribute( RestServer::ERROR ));
         $statusCode = ( isset( $config[CorsHandler::CORS][CorsHandler::ERRORCODE2] ))
-            ? $config[CorsHandler::CORS][CorsHandler::ERRORCODE2]
-            : 433;
+                             ? $config[CorsHandler::CORS][CorsHandler::ERRORCODE2]
+                             : 433;
         $this->assertEquals( $statusCode, $response->getStatusCode());
     }
 
@@ -209,14 +222,28 @@ class CorsHandlerTest extends TestCase
     {
         $dataArr   = [];
         $dataArr[] = [
-            [CorsHandler::ORIGIN => 'wrong.com'],
-            [CorsHandler::CORS => [RestServer::ALLOW => ['test.com']]],
+            [
+                CorsHandler::ORIGIN => 'wrong.com'
+            ],
+            [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
+                CorsHandler::CORS => [
+                    RestServer::ALLOW => [
+                        'test.com'
+                    ],
+                ],
+            ],
         ];
         $dataArr[] = [
-            [CorsHandler::ORIGIN => 'wrong.com'],
             [
+                CorsHandler::ORIGIN => 'wrong.com'
+            ],
+            [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
                 CorsHandler::CORS => [
-                    RestServer::ALLOW       => ['test.com'],
+                    RestServer::ALLOW       => [
+                        'test.com',
+                    ],
                     CorsHandler::ERRORCODE2 => 418,
                 ],
             ],
@@ -226,7 +253,7 @@ class CorsHandlerTest extends TestCase
     }
 
     /**
-     * test validateCors, require origin header and no match, ERRORCODE2
+     * test validateCors, found origin header and no match, ERRORCODE3
      *
      * @test
      * @dataProvider validateCors3bProvider
@@ -251,9 +278,9 @@ class CorsHandlerTest extends TestCase
             new Response()
         );
         $this->assertTrue( $request->getAttribute( RestServer::ERROR ));
-        $statusCode = ( isset( $config[CorsHandler::CORS][CorsHandler::ERRORCODE2] ))
-            ? $config[CorsHandler::CORS][CorsHandler::ERRORCODE2]
-            : 403;
+        $statusCode = ( isset( $config[CorsHandler::CORS][CorsHandler::ERRORCODE3] ))
+                             ? $config[CorsHandler::CORS][CorsHandler::ERRORCODE3]
+                             : 403;
         $this->assertEquals( $statusCode, $response->getStatusCode());
     }
 
@@ -264,47 +291,76 @@ class CorsHandlerTest extends TestCase
     {
         $dataArr   = [];
         $dataArr[] = [
-            [CorsHandler::ORIGIN => 'test.com'],
-            [CorsHandler::CORS => [
-                    RestServer::ALLOW => ['test.com'],
+            [
+                CorsHandler::ORIGIN => 'test.com'
+            ],
+            [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
+                CorsHandler::CORS => [
+                    RestServer::ALLOW => [
+                        'test.com',
+                    ],
                 ],
             ],
         ];
         $dataArr[] = [
-            [CorsHandler::ORIGIN => 'test.com'],
             [
+                CorsHandler::ORIGIN => 'test.com'
+            ],
+            [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
                 CorsHandler::CORS => [
-                    RestServer::ALLOW                          => ['test.com'],
+                    RestServer::ALLOW                          => [
+                        'test.com',
+                    ],
                     CorsHandler::ACCESSCONTROLALLOWCREDENTIALS => false,
                 ],
             ],
         ];
         $dataArr[] = [
-            [CorsHandler::ORIGIN => 'test.com'],
             [
+                CorsHandler::ORIGIN => 'test.com'
+            ],
+            [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
                 CorsHandler::CORS => [
-                    RestServer::ALLOW                          => ['test.com'],
+                    RestServer::ALLOW                          => [
+                        'test.com',
+                    ],
                     CorsHandler::ACCESSCONTROLALLOWCREDENTIALS => true,
                 ],
             ],
         ];
         $dataArr[] = [
-            [CorsHandler::ORIGIN => 'test.com'],
             [
+                CorsHandler::ORIGIN => 'test.com'
+            ],
+            [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
                 CorsHandler::CORS => [
-                    RestServer::ALLOW                          => ['test.com'],
+                    RestServer::ALLOW                          => [
+                        'test.com',
+                    ],
                     CorsHandler::ACCESSCONTROLALLOWCREDENTIALS => true,
                     CorsHandler::ACCESSCONTROLEXPOSEHEADERS    => [],
                 ],
             ],
         ];
         $dataArr[] = [
-            [CorsHandler::ORIGIN => 'test.com'],
             [
+                CorsHandler::ORIGIN => 'test.com'
+            ],
+            [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
                 CorsHandler::CORS => [
-                    RestServer::ALLOW                          => ['test.com'],
+                    RestServer::ALLOW                          => [
+                        'test.com',
+                    ],
                     CorsHandler::ACCESSCONTROLALLOWCREDENTIALS => true,
-                    CorsHandler::ACCESSCONTROLEXPOSEHEADERS    => ['X-header-to-expose-1', 'X-header-to-expose-2'],
+                    CorsHandler::ACCESSCONTROLEXPOSEHEADERS    => [
+                        'X-header-to-expose-1',
+                        'X-header-to-expose-2',
+                    ],
                 ],
             ],
         ];
@@ -376,8 +432,11 @@ class CorsHandlerTest extends TestCase
                 CorsHandler::ACCESSCONTROLREQUESTMETHOD => RequestMethodHandler::METHOD_POST,
             ],
             [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
                 CorsHandler::CORS => [
-                    RestServer::ALLOW => ['test.com'],
+                    RestServer::ALLOW => [
+                        'test.com',
+                    ],
                 ],
             ],
         ];
@@ -387,9 +446,12 @@ class CorsHandlerTest extends TestCase
                 CorsHandler::ACCESSCONTROLREQUESTMETHOD => RequestMethodHandler::METHOD_POST,
             ],
             [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
                 CorsHandler::CORS => [
-                    RestServer::ALLOW       => ['test.com'],
-                    CorsHandler::ERRORCODE3 => 418,
+                    RestServer::ALLOW => [
+                        'test.com',
+                    ],
+                    CorsHandler::ERRORCODE4 => 418,
                 ],
             ],
         ];
@@ -399,7 +461,7 @@ class CorsHandlerTest extends TestCase
 
     /**
      * test validateCors, OPTIONS preflight request but wrong Access-Control-Request-Method
-     *                            i.e. ERRORCODE3
+     *                            i.e. $ERRORFMT4
      *
      * @test
      * @dataProvider validateCors5Provider
@@ -425,8 +487,8 @@ class CorsHandlerTest extends TestCase
         );
 
         $this->assertTrue( $request->getAttribute( RestServer::ERROR ));
-        $statusCode = ( isset( $config[CorsHandler::CORS][CorsHandler::ERRORCODE3] ))
-                             ? $config[CorsHandler::CORS][CorsHandler::ERRORCODE3]
+        $statusCode = ( isset( $config[CorsHandler::CORS][CorsHandler::ERRORCODE4] ))
+                             ? $config[CorsHandler::CORS][CorsHandler::ERRORCODE4]
                              : 406;
         $this->assertEquals( $statusCode, $response->getStatusCode());
     }
@@ -444,8 +506,11 @@ class CorsHandlerTest extends TestCase
                 CorsHandler::ACCESSCONTROLREQUESTHEADERS => 'X-Control-Header-1err',
             ],
             [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
                 CorsHandler::CORS => [
-                    RestServer::ALLOW => ['test.com'],
+                    RestServer::ALLOW => [
+                        'test.com',
+                    ],
                 ],
             ],
         ];
@@ -456,10 +521,15 @@ class CorsHandlerTest extends TestCase
                 CorsHandler::ACCESSCONTROLREQUESTHEADERS => 'X-Control-Header-2err',
             ],
             [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
                 CorsHandler::CORS => [
-                    RestServer::ALLOW                      => ['test.com'],
-                    CorsHandler::ACCESSCONTROLALLOWHEADERS => ['X-Control-Header-2'],
-                    CorsHandler::ERRORCODE4                => 418,
+                    RestServer::ALLOW                      => [
+                        'test.com',
+                    ],
+                    CorsHandler::ACCESSCONTROLALLOWHEADERS => [
+                        'X-Control-Header-2',
+                    ],
+                    CorsHandler::ERRORCODE5                => 418,
                 ],
             ],
         ];
@@ -470,8 +540,8 @@ class CorsHandlerTest extends TestCase
     /**
      * test validateCors, OPTIONS preflight request and
      *                            right Access-Control-Request-Method
-     *                            missing/unvalid Access-Control-Request-Headers
-     *                            i.e. ERRORCODE4
+     *                            missing/invalid Access-Control-Request-Headers
+     *                            i.e. ERRORCODE5
      *
      * @test
      * @dataProvider validateCors6Provider
@@ -497,8 +567,8 @@ class CorsHandlerTest extends TestCase
         );
 
         $this->assertTrue( $request->getAttribute( RestServer::ERROR, false ));
-        $statusCode = ( isset( $config[CorsHandler::CORS][CorsHandler::ERRORCODE4] ))
-                             ? $config[CorsHandler::CORS][CorsHandler::ERRORCODE4]
+        $statusCode = ( isset( $config[CorsHandler::CORS][CorsHandler::ERRORCODE5] ))
+                             ? $config[CorsHandler::CORS][CorsHandler::ERRORCODE5]
                              : 406;
         $this->assertEquals( $statusCode, $response->getStatusCode());
     }
@@ -516,9 +586,15 @@ class CorsHandlerTest extends TestCase
                 CorsHandler::ACCESSCONTROLREQUESTHEADERS => 'X-Control-Header-1',
             ],
             [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
                 CorsHandler::CORS => [
-                    RestServer::ALLOW                      => ['test.com'],
-                    CorsHandler::ACCESSCONTROLALLOWHEADERS => ['X-Control-Header-1', 'X-Control-Header-2'],
+                    RestServer::ALLOW                      => [
+                        'test.com',
+                    ],
+                    CorsHandler::ACCESSCONTROLALLOWHEADERS => [
+                        'X-Control-Header-1',
+                        'X-Control-Header-2',
+                    ],
                 ],
             ],
         ];
@@ -529,9 +605,16 @@ class CorsHandlerTest extends TestCase
                 CorsHandler::ACCESSCONTROLREQUESTHEADERS => 'X-Control-Header-1',
             ],
             [
+                RestServer::CORRELATIONID => RestServer::getGuid(),
                 CorsHandler::CORS => [
-                    RestServer::ALLOW                          => ['test1.com', 'test2.com'],
-                    CorsHandler::ACCESSCONTROLALLOWHEADERS     => ['X-Control-Header-1', 'X-Control-Header-2'],
+                    RestServer::ALLOW                          => [
+                        'test1.com',
+                        'test2.com',
+                    ],
+                    CorsHandler::ACCESSCONTROLALLOWHEADERS     => [
+                        'X-Control-Header-1',
+                        'X-Control-Header-2',
+                    ],
                     CorsHandler::ACCESSCONTROLMAXAGE           => 1234,
                     CorsHandler::ACCESSCONTROLALLOWCREDENTIALS => true,
                 ],

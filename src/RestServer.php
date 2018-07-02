@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.25
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -39,6 +39,11 @@ use FastRoute\RouteCollector;
 use FastRoute\Dispatcher;
 use Kigkonsult\RestServer\Handlers\LogUtilHandler;
 
+/**
+ * class RestServer
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ */
 class RestServer
 {
     /**
@@ -70,11 +75,17 @@ class RestServer
 
     /**
      * @var string version
+     *
+     * @access private
+     * @static
      */
-    private static $version = '0.9.25';
+    private static $version = '0.9.123';
 
     /**
      * @var string misc
+     *
+     * @access private
+     * @static
      */
     private static $space   = ' ';
     private static $slash   = '/';
@@ -83,34 +94,56 @@ class RestServer
      * Handler callbacks, called before routing
      *
      * @var callable[]
+     *
+     * @access private
+     * @static
      */
     private static $builtinPreHandlers = [
+        [ __NAMESPACE__ . '\\Handlers\\IpHandler',             'validateIP' ],
         [ __NAMESPACE__ . '\\Handlers\\RequestMethodHandler',  'validateRequestMethod' ],
         [ __NAMESPACE__ . '\\Handlers\\CorsHandler',           'validateCors' ],
-//      [ __NAMESPACE__ . '\\Handlers\\AuthenticationHandler', 'validateAuthentication' ],
+        [ __NAMESPACE__ . '\\Handlers\\AuthenticationHandler', 'validateAuthentication' ],
         [ __NAMESPACE__ . '\\Handlers\\EncodingHandler',       'validateRequestHeader' ],
         [ __NAMESPACE__ . '\\Handlers\\ContentTypeHandler',    'validateRequestHeader' ],
         [ __NAMESPACE__ . '\\Handlers\\ContentTypeHandler',    'validateResponseHeader' ],
         [ __NAMESPACE__ . '\\Handlers\\EncodingHandler',       'validateResponseHeader' ],
-        [ __NAMESPACE__ . '\\Handlers\\EncodingHandler',       'deCode' ],
-        [ __NAMESPACE__ . '\\Handlers\\ContentTypeHandler',    'unSerialize' ],
+        [ __NAMESPACE__ . '\\Handlers\\EncodingHandler',       'deCodeRequest' ],
+        [ __NAMESPACE__ . '\\Handlers\\ContentTypeHandler',    'unSerializeRequest' ],
     ];
 
     /**
      * Handler callbacks, called after routing
      *
      * @var callable[]
+     *
+     * @access private
+     * @static
      */
     private static $builtinPostHandlers = [
-        [ __NAMESPACE__ . '\\Handlers\\ContentTypeHandler', 'serialize' ],
-        [ __NAMESPACE__ . '\\Handlers\\EncodingHandler',    'enCode' ],
+        [ __NAMESPACE__ . '\\Handlers\\ContentTypeHandler', 'serializeResponse' ],
+        [ __NAMESPACE__ . '\\Handlers\\EncodingHandler',    'enCodeResponse' ],
         [ __NAMESPACE__ . '\\Handlers\\ContentTypeHandler', 'setContentLength' ],
+    ];
+
+    /**
+     * ErrorHandler
+     *
+     * @var callable
+     *
+     * @static
+     */
+    public static $errorHandler = [
+        __NAMESPACE__ . '\\Handlers\\ErrorHandler',
+        'PhpErrors2Exception'
     ];
 
     /**
      * Handler debug callbacks
      *
      * @var callable[]
+     *
+     * @access private
+     * @static
      */
     private static $debugHandlers = [
         [
@@ -127,16 +160,22 @@ class RestServer
      * Configuration
      *
      * @var mixed[]
+     *
+     * @access private
      */
     private $config = [];
 
     /**
      * @var ServerRequestInterface
+     *
+     * @access private
      */
     private $request;
 
     /**
      * @var ResponseInterface
+     *
+     * @access private
      */
     private $response;
 
@@ -144,6 +183,8 @@ class RestServer
      * Callable pre service handlers, each with arguments ( ServerRequestInterface, ResponseInterface )
      *
      * @var callable[]
+     *
+     * @access private
      */
     private $preHandlers = [];
 
@@ -151,6 +192,8 @@ class RestServer
      * Number of service preHandlers
      *
      * @var int
+     *
+     * @access private
      */
     private $noPreHandlers = 0;
 
@@ -158,6 +201,8 @@ class RestServer
      * Callable post service handlers, each with arguments ( ServerRequestInterface, ResponseInterface )
      *
      * @var callable[]
+     *
+     * @access private
      */
     private $postHandlers = [];
 
@@ -165,6 +210,8 @@ class RestServer
      * Service definitions
      *
      * @var array
+     *
+     * @access private
      */
     private $services = [];
 
@@ -172,6 +219,8 @@ class RestServer
      * Number of rest services
      *
      * @var int
+     *
+     * @access private
      */
     private $noOfServices = 0;
 
@@ -179,6 +228,8 @@ class RestServer
      * Callable final handler, with arguments ( ServerRequestInterface, ResponseInterface )
      *
      * @var callable[]
+     *
+     * @access private
      */
     private $finalHandler = null;
 
@@ -297,8 +348,28 @@ class RestServer
         if( ! isset( $config[self::INIT] ))
             $config[self::INIT] = \microtime( true );
         if( ! isset( $config[self::CORRELATIONID] ))
-            $config[self::CORRELATIONID] = strtoupper( bin2hex( openssl_random_pseudo_bytes( 16) ));
+            $config[self::CORRELATIONID] = self::getGuid();
         $this->config           = $config;
+    }
+
+    /**
+     * Return guid
+     *
+     * @return string
+     * @static
+     * $link https://php.net/manual/en/function.com-create-guid.php#117893
+     */
+    public static function getGuid() {
+        static $FCNNAME = 'com_create_guid';
+        static $BRCS    = '{}';
+        static $FMT     = '%s%s-%s-%s-%s-%s%s%s';
+        if( \function_exists( $FCNNAME ) ) {
+            return trim( com_create_guid(), $BRCS );
+        }
+        $data    = \openssl_random_pseudo_bytes(16 );
+        $data[6] = \chr(ord( $data[6] ) & 0x0f | 0x40 ); // set version to 0100
+        $data[8] = \chr(ord( $data[8] ) & 0x3f | 0x80 ); // set bits 6-7 to 10
+        return \vsprintf( $FMT, \str_split( \bin2hex( $data ), 4 ));
     }
 
     /**
@@ -311,9 +382,12 @@ class RestServer
     public function setConfig(
         array $config
     ) {
-        foreach( [ self::INIT, self::CORRELATIONID ] as $key )
-            $config[$key] = $this->config[$key];
-        $this->config       = $config;
+        foreach( [ self::INIT, self::CORRELATIONID ] as $key ) {
+            if( !  isset( $config[$key] )) {
+                $config[$key] = $this->config[$key];
+            }
+        }
+        $this->config = $config;
         $this->addHandlersFromConfig( $config );
         $this->attachRestServicesFromConfig( $config );
         $this->addFinalHandlerFromConfig( $config );
@@ -361,9 +435,7 @@ class RestServer
             $corrId = $this->config[self::CORRELATIONID] . self::$space;
             self::log( $corrId . LogUtilHandler::jTraceEx( $error ), self::ERROR );
             self::log( $corrId . LogUtilHandler::getRequestToString( $this->request ), self::ERROR );
-            $this->preHandlers  = [];
-            $this->services     = [];
-            $this->postHandlers = [];
+            $this->services = [];
             return true;
         } // end if
         return false;
@@ -398,7 +470,17 @@ class RestServer
     ) {
         if( ! empty( $this->finalHandler )) {
             $handler = $this->finalHandler;
-            $handler( $this->request, $response );
+            \set_error_handler( RestServer::$errorHandler );
+            try {
+                $handler( $this->request, $response );
+            } catch( Exception $e ) {
+                $corrId = $this->config[self::CORRELATIONID] . self::$space;
+                self::log( $corrId . LogUtilHandler::jTraceEx( $e ), self::ERROR );
+                self::log( $corrId . LogUtilHandler::getRequestToString( $this->request ), self::ERROR );
+                self::log( $corrId . LogUtilHandler::getResponseToString( $response ), self::ERROR );
+            } finally {
+                \restore_error_handler();
+            }
         }
     }
 
@@ -459,7 +541,7 @@ class RestServer
     ) {
         static $FMT = '%s : Handler #%d is not callable';
         if ( ! \is_array( $handler ) ||
-            ( 2 == \count( $handler )) &&
+           ( 2 == \count( $handler )) &&
             \is_callable( $handler, true )) {
             $handler = [ $handler ];
         } // end if
@@ -485,12 +567,22 @@ class RestServer
     private function execPreHandlers(
     ) {
         foreach ( $this->preHandlers as $x => $handler ) {
-            list( $this->request, $this->response ) = $handler( $this->request, $this->response );
-            if ( false !== $this->request->getAttribute( self::ERROR, false )) {
-                $this->preHandlers = [];
+            \set_error_handler( RestServer::$errorHandler );
+            try {
+                list( $this->request, $this->response ) = $handler( $this->request, $this->response );
+            } catch( Exception $e ) {
+                $corrId = $this->config[self::CORRELATIONID] . self::$space;
+                self::log( $corrId . LogUtilHandler::jTraceEx( $e ), self::ERROR );
+                self::log( $corrId . LogUtilHandler::getRequestToString( $this->request ), self::ERROR );
+                $this->request  = $this->request->withAttribute( self::ERROR, true );
+                $this->response = $this->response->withStatus( 500 );
                 $this->services    = []; // skip services
-                return;
-                break;
+            } finally {
+                \restore_error_handler();
+            }
+            if ( false !== $this->request->getAttribute( self::ERROR, false )) {
+                $this->services    = []; // skip services
+                continue;
             } // end if
             if (( 1 == $x ) && // i.e. CorsHandler
                 ( RequestMethodHandler::METHOD_OPTIONS == $this->request->getMethod()) ) {
@@ -510,9 +602,6 @@ class RestServer
                     $this->response = $this->response->withStatus( $e->getCode());
                 }
                 $this->postHandlers = [];
-                $this->services     = []; // skip services
-                return;
-                break;
             } // end if
         } // end foreach
     }
@@ -525,7 +614,19 @@ class RestServer
     private function execPostHandlers()
     {
         foreach ( $this->postHandlers as $x => $handler ) {
-            list( $this->request, $this->response ) = $handler( $this->request, $this->response );
+            \set_error_handler( RestServer::$errorHandler );
+            try {
+                list( $this->request, $this->response ) = $handler( $this->request, $this->response );
+            } catch( Exception $e ) {
+                $corrId = $this->config[self::CORRELATIONID] . self::$space;
+                self::log( $corrId . LogUtilHandler::jTraceEx( $e ), self::ERROR );
+                self::log( $corrId . LogUtilHandler::getRequestToString( $this->request ), self::ERROR );
+                $this->request  = $this->request->withAttribute( self::ERROR, true );
+                $this->response = $this->response->withStatus( 500 );
+                return;
+            } finally {
+                \restore_error_handler();
+            }
             if ( false !== $this->request->getAttribute( self::ERROR, false )) {
                 return;
                 break;
@@ -543,7 +644,7 @@ class RestServer
     private function addFinalHandlerFromConfig(
         array $config
     ) {
-        if ( isset( $config[self::FINALHANDLER] )) {
+        if( isset( $config[self::FINALHANDLER] )) {
             $this->addFinalHandler( $config[self::FINALHANDLER] );
         }
         unset( $this->config[self::FINALHANDLER] );
@@ -802,10 +903,23 @@ class RestServer
                     );
                 }
                 $handler = $serviceInfo[1];
-                return $handler( $this->request, $this->response );
+                \set_error_handler( RestServer::$errorHandler );
+                try {
+                    $response = $handler( $this->request, $this->response );
+                    return $response;
+                } catch( Exception $e ) {
+                    $corrId = $this->config[self::CORRELATIONID] . self::$space;
+                    self::log( $corrId . LogUtilHandler::jTraceEx( $e ), self::ERROR );
+                    self::log( $corrId . LogUtilHandler::getRequestToString( $this->request ), self::ERROR );
+                    return $this->response->withStatus( 500 )
+                                          ->withRawBody( null )
+                                          ->withBody( StreamFactory::createStream());
+                } finally {
+                    \restore_error_handler();
+                }
                 break;
             case Dispatcher::METHOD_NOT_ALLOWED :
-                $corrId = $this->config[self::CORRELATIONID] . self::$space;
+                $corrId     = $this->config[self::CORRELATIONID] . self::$space;
                 $requestUri = $this->request->getAttribute( self::REQUESTTARGET, self::$slash );
                 self::log( \sprintf( $FMT4, $corrId, $httpMethod, $requestUri ), self::WARNING );
                 self::log( $corrId . LogUtilHandler::getRequestToString( $this->request ), self::WARNING );
@@ -821,7 +935,7 @@ class RestServer
             case Dispatcher::NOT_FOUND :
                 // no break
             default :
-                $corrId = $this->config[self::CORRELATIONID] . self::$space;
+                $corrId     = $this->config[self::CORRELATIONID] . self::$space;
                 $requestUri = $this->request->getAttribute( self::REQUESTTARGET, self::$slash );
                 self::log( \sprintf( $FMT3, $corrId, $httpMethod, $requestUri ), self::WARNING );
                 self::log( $corrId . LogUtilHandler::getRequestToString( $this->request ), self::WARNING );
@@ -879,8 +993,8 @@ class RestServer
      */
     private static function updateRequest(
         ServerRequestInterface $request,
-        array $arguments,
-        $httpMethod
+                         array $arguments,
+                               $httpMethod
     ) {
         static $queryMethods = [
             RequestMethodHandler::METHOD_DELETE,
@@ -913,10 +1027,9 @@ class RestServer
      * @param ServerRequestInterface $request
      * @param ResponseInterface      $response
      * @return ResponseInterface
-     * @access private
      * @static
      */
-    private static function pingService(
+    public static function pingService(
         ServerRequestInterface $request,
         ResponseInterface $response
     ) {
@@ -939,7 +1052,7 @@ class RestServer
      */
     public static function getPingServiceDef()
     {
-        $class = get_class();
+        $class = \get_class();
         return [
             self::METHOD   => [
                 RequestMethodHandler::METHOD_GET,

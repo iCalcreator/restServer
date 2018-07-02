@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -37,11 +37,13 @@ use RuntimeException;
 /**
  * corsHandler provides simple request support, general for ALL requests uri target
  *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ *
  * @see cfg/cfg.2.cors.php
  * @see https://www.html5rocks.com/en/tutorials/cors/
  * @see https://www.html5rocks.com/static/images/cors_server_flowchart.png
  */
-class CorsHandler extends AbstractCAHandler
+class CorsHandler extends AbstractCAHandler implements HandlerInterface
 {
     /**
      * Request header
@@ -52,26 +54,6 @@ class CorsHandler extends AbstractCAHandler
      * config key
      */
     const CORS                          = 'cors';
-
-    /**
-     * required Origin missing,  400 - Bad Request
-     */
-    const ERRORCODE1                    = 'errorCode1';
-
-    /**
-     * incorrect Origin, 403 - Forbidden
-     */
-    const ERRORCODE2                    = 'errorCode2';
-
-    /**
-     * no accepted request method in 'Access-Control-Request-Method',   406 - Not Acceptable
-     */
-    const ERRORCODE3                    = 'errorCode3';
-
-    /**
-     * one or more non-accepted request header(s) in 'Access-Control-Request-Headers', 406 - Not Acceptable
-     */
-    const ERRORCODE4                    = 'errorCode4';
 
     /**
      * cors header prefix
@@ -121,17 +103,50 @@ class CorsHandler extends AbstractCAHandler
     /**
      * Default error codes
      */
-    private static $defaults = [
-        self::ERRORCODE1 => 400,
-        self::ERRORCODE2 => 403,
-        self::ERRORCODE3 => 406,
-        self::ERRORCODE4 => 406,
+    private static $DEFAULTS = [
+        self::ERRORCODE1 => 400, // required Origin missing,  400 - Bad Request
+        self::ERRORCODE2 => 403, // incorrect Origin, 403 - Forbidden
+        self::ERRORCODE3 => 403, // incorrect Origin, 403 - Forbidden
+        self::ERRORCODE4 => 406, // no accepted request method in 'Access-Control-Request-Method',   406 - Not Acceptable
+        self::ERRORCODE5 => 406, // one or more non-accepted request header(s) in 'Access-Control-Request-Headers', 406 - Not Acceptable
+    ];
+
+    /**
+     * Return error status codes to check changed log prio
+     */
+    private static $STATUSCODESWITHALTLOGPRIO = [
+        self::ERRORCODE1,
+        self::ERRORCODE2,
+        self::ERRORCODE3
     ];
 
     /**
      * misc.
      */
     private static $COMMASP = ', ';
+
+    /**
+     * Return bool true if header is a CORS header
+     *
+     * @param string $header
+     * @return bool
+     * @static
+     */
+    public static function isCorsHeader(
+        $header
+    ) {
+        $header = \strtr( $header, self::$US, self::$D );
+        if( 0 === \strcasecmp( self::ORIGIN, $header )) {
+            return true;
+        }
+        if( 0 === \strcasecmp(
+            self::CORSHEADERPRSFIX,
+            \substr( $header, 0, \strlen( self::CORSHEADERPRSFIX ))
+        )) {
+            return true;
+        }
+        return false;
+    }
 
     /**
      * Handler validating cors
@@ -149,13 +164,25 @@ class CorsHandler extends AbstractCAHandler
         ResponseInterface      $response
     ) {
         static $ERRORFMT1  = 'Origin header expected';
-        static $ERRORFMT2a = 'Origin header found (%s) but not expected';
-        static $ERRORFMT2b = 'Origin found (%s) but not valid';
-        static $ERRORFMT34 = 'Error in cors preflight request';
+        static $ERRORFMT2  = 'Origin header found (%s) but not expected';
+        static $ERRORFMT3  = 'Origin found (%s) but not valid';
+        static $ERRORFMT45 = 'Error in cors preflight request';
         static $TRUE       = 'true';
 
-        $corsCfg           = parent::getConfig( $request, self::CORS, self::$defaults );
-        $corsIgnore        = ( isset( $corsCfg[RestServer::IGNORE] ) && ( true === $corsCfg[RestServer::IGNORE] ));
+        if( parent::earlierErrorExists( $request )) {
+            return [
+                $request,
+                $response,
+            ];
+        }
+        $corsCfg           = parent::getConfig(
+            $request, 
+            self::CORS, 
+            self::$DEFAULTS,
+            self::$STATUSCODESWITHALTLOGPRIO
+        );
+        $corsIgnore        = ( isset( $corsCfg[RestServer::IGNORE] ) && 
+                             ( true === $corsCfg[RestServer::IGNORE] ));
         $corsExpected      = ( isset( $corsCfg[RestServer::ALLOW] ));
         $hasOriginHeader   = $request->hasHeader( self::ORIGIN );
 
@@ -177,29 +204,29 @@ class CorsHandler extends AbstractCAHandler
         if( $corsExpected && ! $hasOriginHeader ) {
             return self::doLogReturn(
                 $request->withAttribute( RestServer::ERROR, true ),
-                $response->withStatus( $corsCfg[self::ERRORCODE1] ),
+                $response->withStatus( $corsCfg[self::ERRORCODE1][0] ),
                 new RuntimeException( $ERRORFMT1 ),
-                RestServer::WARNING
+                $corsCfg[self::ERRORCODE1][1]
             );
         } // end if
 
         $requestOriginHeaderValue = $request->getHeader( self::ORIGIN )[0];
-        // Origin not expected but found and not ignored, error 2a
+        // Origin not expected but found and not ignored
         if( ! $corsExpected ) {
             return self::doLogReturn(
                 $request->withAttribute( RestServer::ERROR, true ),
-                $response->withStatus( $corsCfg[self::ERRORCODE2] ),
-                new RuntimeException( sprintf( $ERRORFMT2a, $requestOriginHeaderValue )),
-                RestServer::WARNING
+                $response->withStatus( $corsCfg[self::ERRORCODE2][0] ),
+                new RuntimeException( \sprintf( $ERRORFMT2, $requestOriginHeaderValue )),
+                $corsCfg[self::ERRORCODE2][1]
             );
         } // end if
-        // Origin found but not valid, error 2b
+        // Origin found but not valid
         if( ! self::checkOrigin( $corsCfg, $requestOriginHeaderValue )) {
             return self::doLogReturn(
                 $request->withAttribute( RestServer::ERROR, true ),
-                $response->withStatus( $corsCfg[self::ERRORCODE2] ),
-                new RuntimeException( sprintf( $ERRORFMT2b, $requestOriginHeaderValue )),
-                RestServer::WARNING
+                $response->withStatus( $corsCfg[self::ERRORCODE3][0] ),
+                new RuntimeException( \sprintf( $ERRORFMT3, $requestOriginHeaderValue )),
+                $corsCfg[self::ERRORCODE3][1]
             );
         } // end if
 
@@ -216,7 +243,7 @@ class CorsHandler extends AbstractCAHandler
                 return self::doLogReturn(
                     $request->withAttribute( RestServer::ERROR, true ),
                     $response->withStatus( $errorCode ),
-                    new RuntimeException( $ERRORFMT34 ),
+                    new RuntimeException( $ERRORFMT45 ),
                     RestServer::WARNING
                 );
             } // end if
@@ -235,7 +262,7 @@ class CorsHandler extends AbstractCAHandler
         );
 
         if ( isset( $corsCfg[self::ACCESSCONTROLALLOWCREDENTIALS] ) &&
-            (bool) $corsCfg[self::ACCESSCONTROLALLOWCREDENTIALS] ) {
+             (bool) $corsCfg[self::ACCESSCONTROLALLOWCREDENTIALS] ) {
             // allow cookies
             $response = $response->withHeader(
                 self::ACCESSCONTROLALLOWCREDENTIALS,
@@ -316,7 +343,7 @@ class CorsHandler extends AbstractCAHandler
             }
         } // end foreach
         if ( ! $found ) { // invalid access control request method, error3
-            $errorCode = $corsCfg[self::ERRORCODE3];
+            $errorCode = $corsCfg[self::ERRORCODE4];
             return $response;
         }
         $response = $response->withHeader(
@@ -340,7 +367,7 @@ class CorsHandler extends AbstractCAHandler
                     }
                 } // end foreach
                 if ( ! $found ) { // invalid access control request header, error4
-                    $errorCode = $corsCfg[self::ERRORCODE4];
+                    $errorCode = $corsCfg[self::ERRORCODE5];
                     return $response;
                 } // end if
             } // end foreach

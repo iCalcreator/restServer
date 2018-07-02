@@ -6,7 +6,7 @@
  *
  * Copyright 2018 Kjell-Inge Gustafsson, kigkonsult, All rights reserved
  * Link      http://kigkonsult.se/restServer/index.php
- * Version   0.9.23
+ * Version   0.9.123
  * License   Subject matter of licence is the software restServer.
  *           The above copyright, link, package and version notices and
  *           this licence notice shall be included in all copies or
@@ -27,15 +27,15 @@
  *           If not, see <http://www.gnu.org/licenses/>.
  */
 
-    /**
-     *
-     * @since     2018-02-09
-     */
-
 namespace Kigkonsult\RestServer;
 
 use PHPUnit\Framework\TestCase;
 
+/**
+ * class ResponseTest
+ *
+ * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
+ */
 class ResponseTest extends TestCase
 {
     /**

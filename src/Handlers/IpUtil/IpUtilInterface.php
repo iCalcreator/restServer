@@ -27,13 +27,22 @@
  *           If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace Kigkonsult\RestServer\Handlers\Exceptions;
+namespace Kigkonsult\RestServer\Handlers\IpUtil;
 
 /**
- * Class JsonErrorException
+ * interface IpUtilInterface
  *
  * @author      Kjell-Inge Gustafsson <ical@kigkonsult.se>
  */
-class JsonErrorException extends \Exception
+interface IpUtilInterface
 {
+    /**
+     * Constants, headers, cfg keys etc
+     */
+    const AST    = '*';
+    const COLON  = ':';
+    const DASH   = '-';
+    const DOT    = '.';
+    const SLASH  = '/';
+    const ZERO   = '0';
 }
